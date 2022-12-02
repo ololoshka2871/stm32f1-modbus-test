@@ -4,7 +4,6 @@
 #![feature(macro_metavar_expr)]
 
 mod config;
-mod hw;
 mod support;
 
 use panic_abort as _;
@@ -22,10 +21,6 @@ use stm32f1xx_hal::time::Hertz;
 use stm32f1xx_hal::timer::{PwmChannel, Timer};
 
 use systick_monotonic::Systick;
-
-use support::clocking::{ClockConfigProvider, MyConfig};
-
-use hw::{ADC_DEVIDER, AHB_DEVIDER, APB1_DEVIDER, APB2_DEVIDER, PLL_MUL, PLL_P_DIV, USB_DEVIDER};
 
 //-----------------------------------------------------------------------------
 
