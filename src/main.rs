@@ -16,7 +16,6 @@ use stm32f1xx_hal::gpio::{
     PB6, PC13, PC14, PC15,
 };
 use stm32f1xx_hal::pac::{Interrupt, TIM1, TIM2, TIM4};
-use stm32f1xx_hal::rcc::{HPre, PPre};
 use stm32f1xx_hal::time::Hertz;
 use stm32f1xx_hal::timer::{PwmChannel, Timer};
 
@@ -39,6 +38,7 @@ mod app {
 
     #[init]
     fn init(ctx: init::Context) -> (Shared, Local, init::Monotonics) {
+        use stm32f1xx_hal::prelude::_fugit_RateExtU32;
         use stm32f1xx_hal::prelude::_stm32_hal_rcc_RccExt;
 
         let mut flash = ctx.device.FLASH.constrain();
@@ -53,7 +53,7 @@ mod app {
         */
 
         let rcc = ctx.device.RCC.constrain();
-        let clocks = rcc.cfgr.freeze(&mut flash.acr);
+        let clocks = rcc.cfgr.sysclk(16u32.MHz()).freeze(&mut flash.acr);
 
         let mono = Systick::new(ctx.core.SYST, clocks.sysclk().to_Hz());
 

@@ -1,0 +1,3 @@
+[submodule "libs/freemodbus-rs/freemodbus-dist"]
+	path = libs/freemodbus-rs/freemodbus-dist
+	url = https://github.com/MagicJack/freeModbus.git
