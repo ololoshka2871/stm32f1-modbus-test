@@ -7,5 +7,13 @@
     "rust-analyzer.cargo.target": "thumbv7m-none-eabi",
     "rust-analyzer.checkOnSave.allTargets": false,
     "cortex-debug.registerUseNaturalFormat": false,
-    "cortex-debug.variableUseNaturalFormat": true
+    "cortex-debug.variableUseNaturalFormat": true,
+    "files.associations": {
+        "mb.h": "c",
+        "port.h": "c",
+        "mbport.h": "c",
+        "mbconfig.h": "c",
+        "mb_common.h": "c",
+        "mb_types.h": "c"
+    }
 }
