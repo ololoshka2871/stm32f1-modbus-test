@@ -35,7 +35,9 @@ mod app {
     }
 
     #[local]
-    struct Local {}
+    struct Local {
+        led: PA5<Output<PushPull>>,
+    }
 
     #[monotonic(binds = SysTick, default = true)]
     type MonoTimer = Systick<{ config::SYSTICK_RATE_HZ }>;
@@ -69,7 +71,7 @@ mod app {
         */
 
         let rcc = ctx.device.RCC.constrain();
-        let clocks = rcc.cfgr.sysclk(16u32.MHz()).freeze(&mut flash.acr);
+        let clocks = rcc.cfgr.sysclk(32u32.MHz()).freeze(&mut flash.acr);
 
         let mono = Systick::new(ctx.core.SYST, clocks.sysclk().to_Hz());
 
@@ -83,6 +85,12 @@ mod app {
 
         let mut timer = ctx.device.TIM2.counter_us(&clocks);
         timer.listen(stm32f1xx_hal::timer::Event::Update);
+
+        ctx.device
+            .DBGMCU
+            .cr
+            .modify(|_, w| w.dbg_tim2_stop().set_bit());
+
         unsafe {
             UART2.replace(support::Serial::new(
                 Serial::usart2(
@@ -110,7 +118,11 @@ mod app {
 
         //---------------------------------------------------------------------
 
-        (Shared { rtu }, Local {}, init::Monotonics(mono))
+        let led = gpioa
+            .pa5
+            .into_push_pull_output_with_state(&mut gpioa.crl, stm32f1xx_hal::gpio::PinState::Low);
+
+        (Shared { rtu }, Local { led }, init::Monotonics(mono))
     }
 
     //-------------------------------------------------------------------------
@@ -131,29 +143,35 @@ mod app {
 
     //-------------------------------------------------------------------------
 
-    #[task(binds = USART2, shared = [rtu])]
+    #[task(binds = USART2, shared = [rtu], local = [led])]
     fn usart2_tx(mut ctx: usart2_tx::Context) {
         use libremodbus_rs::SerialEvent;
 
+        let _ = ctx.local.led.set_high();
         ctx.shared.rtu.lock(|rtu| {
             let sr = unsafe { (*USART2::ptr()).sr.read() };
+            let cr = unsafe { (*USART2::ptr()).cr1.read() };
 
-            if sr.txe().bit_is_set() {
+            if sr.txe().bit_is_set() && cr.txeie().bit_is_set() {
                 rtu.on_tx();
             }
 
-            if sr.rxne().bit_is_set() {
+            if sr.rxne().bit_is_set() && cr.rxneie().bit_is_set() {
                 rtu.on_rx();
             }
         });
+        let _ = ctx.local.led.set_low();
     }
 
-    #[task(binds = TIM2, shared = [rtu])]
+    #[task(binds = TIM2, shared = [rtu], local = [/*led*/])]
     fn tim2(mut ctx: tim2::Context) {
         use libremodbus_rs::MBTimerEvent;
 
+        //let _ = ctx.local.led.set_high();
         ctx.shared.rtu.lock(|rtu| {
             rtu.on_timer();
-        })
+            unsafe { (*TIM2::ptr()).sr.modify(|_, w| w.uif().clear_bit()) };
+        });
+        //let _ = ctx.local.led.set_low();
     }
 }
