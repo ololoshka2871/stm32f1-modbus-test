@@ -8,6 +8,14 @@
 * free-modbus
 * pwm-pca9685
 
+## Build
+```
+$ git clone --recurcive https://github.com/ololoshka2871/pwm-20ch
+$ cd pwm-20ch
+$ rustup override set nightly
+$ cargo build
+```
+
 # [cargo make](https://sagiegurari.github.io/cargo-make/)
 1. flash - use openocd
 
