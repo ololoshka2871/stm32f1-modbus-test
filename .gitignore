@@ -26,6 +26,3 @@ __pycache__/
 
 # gimp
 *.xcf
-
-##
-libs/freemodbus-rs
