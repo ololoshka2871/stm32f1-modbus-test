@@ -14,6 +14,7 @@
         "mbport.h": "c",
         "mbconfig.h": "c",
         "mb_common.h": "c",
-        "mb_types.h": "c"
+        "mb_types.h": "c",
+        "*.in": "cpp"
     }
 }

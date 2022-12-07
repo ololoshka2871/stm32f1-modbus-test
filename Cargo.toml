@@ -3,7 +3,7 @@ authors = ["ololoshka2871"]
 edition = "2018"
 readme = "README.md"
 name = "pwm-20ch"
-version = "0.1.0"
+version = "0.2.0"
 resolver = "2"
 
 [dependencies]
@@ -12,6 +12,7 @@ libm = "0.2.5"
 vcell = "0.1.3"
 heapless = { version = "0.7" }
 fugit-timer = "0.1.3"
+byte = { version = "0.2" }
 
 embedded-hal = { version = "0.2.4", features = ["unproven"] }
 cortex-m = "0.7.3"
@@ -22,7 +23,7 @@ panic-abort = "0.3"
 stm32f1xx-hal = { version = "0.9.0", features =["rt"], optional = true }
 
 pwm-pca9685 = "0.3"
-libremodbus-rs = { path = "libs/libremodbus-rs", default-features = false, features = ["rtu", "ascii"] }
+libremodbus-rs = { path = "libs/libremodbus-rs", default-features = false, features = ["rtu", "ascii", "holdings"] }
 
 cortex-m-rtic = { version = "1.1" }
 systick-monotonic = "1.0.1"

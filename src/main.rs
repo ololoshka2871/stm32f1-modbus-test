@@ -12,14 +12,11 @@ use rtic::app;
 use stm32f1xx_hal::afio::AfioExt;
 use stm32f1xx_hal::flash::FlashExt;
 use stm32f1xx_hal::gpio::{
-    Alternate, Floating, GpioExt, Input, Output, PushPull, PA0, PA1, PA2, PA3, PA4, PA5, PA6, PA7,
-    PA9, PB3, PB4, PB5, PB6, PC13, PC14, PC15,
+    Alternate, Floating, GpioExt, Input, Output, PushPull, PA1, PA2, PA3, PA5,
 };
-use stm32f1xx_hal::pac::{Interrupt, TIM1, TIM2, TIM4, USART2};
+use stm32f1xx_hal::pac::{TIM2, USART2};
 use stm32f1xx_hal::serial::{Config, Serial};
-use stm32f1xx_hal::time::Hertz;
 use stm32f1xx_hal::timer::CounterUs;
-use stm32f1xx_hal::timer::{DelayUs, PwmChannel, Timer};
 
 use systick_monotonic::Systick;
 
@@ -57,6 +54,7 @@ mod app {
         > = None;
 
         static mut MODBUS_TIMER: Option<support::Timer<CounterUs<TIM2>>> = None;
+        static mut DATA_STORAGE: Option<support::DataStorage> = None;
 
         let mut flash = ctx.device.FLASH.constrain();
 
@@ -105,6 +103,7 @@ mod app {
             ));
 
             MODBUS_TIMER.replace(support::Timer::new(timer));
+            DATA_STORAGE.replace(support::DataStorage::new());
         }
 
         let rtu = unsafe {
@@ -113,6 +112,7 @@ mod app {
                 UART2.as_mut().unwrap_unchecked(),
                 config::RS485_BOUD_RATE,
                 MODBUS_TIMER.as_mut().unwrap_unchecked(),
+                DATA_STORAGE.as_mut().unwrap_unchecked(),
             )
         };
 
