@@ -5,6 +5,8 @@ readme = "README.md"
 name = "pwm-20ch"
 version = "0.2.0"
 resolver = "2"
+keywords = ["stm32", "pwm", "pca9685", "modbus"]
+repository = "https://github.com/ololoshka2871/pwm-20ch"
 
 [dependencies]
 num = { version = "0.4", default-features = false }
