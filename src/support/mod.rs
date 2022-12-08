@@ -10,4 +10,4 @@ pub use timer_interface::Timer;
 mod data_storage;
 pub use data_storage::DataStorage;
 
-mod f32_ext;
+mod num_ext;

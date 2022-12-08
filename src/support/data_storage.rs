@@ -4,7 +4,7 @@ use byte::{BytesExt, BE};
 use libremodbus_rs::{AccessMode, MbError};
 use stm32f1xx_hal::time::{Hertz, Hz};
 
-use super::f32_ext::F32Ext;
+use super::num_ext::NumExt;
 
 static VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -12,8 +12,8 @@ pub struct DataStorage {
     pub pwm_base_freq: Hertz,
     pub channels_target: [u16; 20],
 
-    pub total_load: f32,
-    pub chank_load: [f32; 10],
+    pub total_load: u16,
+    pub chank_load: [u16; 10],
 }
 
 impl DataStorage {
@@ -21,7 +21,7 @@ impl DataStorage {
         Self {
             pwm_base_freq: Hz(1000u32),
             channels_target: Default::default(),
-            total_load: 0.0,
+            total_load: 0,
             chank_load: Default::default(),
         }
     }
@@ -35,29 +35,30 @@ impl libremodbus_rs::DataInterface for DataStorage {
         reg_num: u16,
     ) -> Result<(), MbError> {
         match reg_addr {
-            0 | 1 => {
+            0x0000 => {
                 // total_load
-                if reg_num + reg_num <= 2 {
-                    let w = self.total_load.split_2u16();
-                    return write_buf(reg_buff, w.iter().skip(reg_addr as usize).copied());
+                if reg_num < 2 {
+                    return reg_buff
+                        .write_with::<u16>(&mut 0, self.total_load, BE)
+                        .map_err(|_| MbError::MB_EIO);
                 }
             }
-            0x100..=0x111 => {
+            0x100..=0x109 => {
                 // chank_load
-                if reg_addr - 0x0100 + reg_num <= 0x0111 {
-                    let d = self
-                        .chank_load
-                        .iter()
-                        .map(|v| v.split_2u16())
-                        .flatten()
-                        .skip(reg_addr as usize - 0x0100);
-
-                    return write_buf(reg_buff, d);
+                if reg_addr - 0x0100 + reg_num <= 0x109 {
+                    return write_buf(
+                        reg_buff,
+                        self.chank_load
+                            .iter()
+                            .skip(reg_addr as usize - 0x100)
+                            .take(reg_num as usize)
+                            .copied(),
+                    );
                 }
             }
             _ => {}
         };
-        Ok(())
+        Err(MbError::MB_ENOREG)
     }
 
     fn rw_holdings(
@@ -79,33 +80,28 @@ impl libremodbus_rs::DataInterface for DataStorage {
                             .write_with::<u16>(&mut 0, crate::config::MB_DEV_ID, BE)
                             .map_err(|_| MbError::MB_EIO)?;
                     }
-                    0x0010 | 0x0011 => {
-                        // HW ver
-                        if (reg_addr - 0x0010 + reg_num) as usize > size_of::<u32>() {
+                    0x0010..=0x0013 => {
+                        if (reg_addr - 0x0010 + reg_num) as usize > 2 * size_of::<u32>() {
                             Err(MbError::MB_ENOREG)?;
                         }
-                        let data = crate::config::HW_VERSION.split_2u16();
+
+                        let hw_ver = crate::config::HW_VERSION.split_2u16();
+                        let mut mcu_id = [0u8; size_of::<u32>()];
+                        mcu_id.copy_from_slice(
+                            &stm32_device_signature::device_id()[..size_of::<u32>()],
+                        );
+                        let mcu_id = u32::from_be_bytes(mcu_id); // вывернуть так чтобы читать было удобнее
+
+                        let mut data = [0u16; 2 * size_of::<u32>() / size_of::<u16>()];
+                        (&mut data[..size_of::<u32>() / size_of::<u16>()])
+                            .clone_from_slice(&hw_ver);
+                        (&mut data[size_of::<u32>() / size_of::<u16>()..])
+                            .clone_from_slice(&mcu_id.split_2u16());
 
                         return write_buf(
                             reg_buff,
                             data.iter()
                                 .skip(reg_addr as usize - 0x0010)
-                                .take(reg_num as usize)
-                                .copied(),
-                        );
-                    }
-                    0x0012 | 0x0013 => {
-                        // MCU_id
-                        if (reg_addr - 0x0012 + reg_num) as usize > size_of::<u32>() {
-                            Err(MbError::MB_ENOREG)?;
-                        }
-                        let id = stm32_device_signature::device_id();
-                        let data: &[u16; 6] = unsafe { core::mem::transmute(id) };
-
-                        return write_buf(
-                            reg_buff,
-                            data.iter()
-                                .skip(reg_addr as usize - 0x0012)
                                 .take(reg_num as usize)
                                 .copied(),
                         );

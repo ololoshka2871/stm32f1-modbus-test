@@ -26,7 +26,7 @@ stm32f1xx-hal = { version = "0.9.0", features =["rt"], optional = true }
 stm32-device-signature = "0.3.3"
 
 pwm-pca9685 = "0.3"
-libremodbus-rs = { path = "libs/libremodbus-rs", default-features = false, features = ["rtu", "ascii", "holdings"] }
+libremodbus-rs = { path = "libs/libremodbus-rs", default-features = false, features = ["rtu", "ascii", "holdings", "inputs"] }
 
 cortex-m-rtic = { version = "1.1" }
 systick-monotonic = "1.0.1"
@@ -59,7 +59,7 @@ default = [
 ]
 
 stm32f103b = ["stm32f103"]
-stm32f103 = ["stm32f1xx-hal/stm32f103", "stm32f1xx-hal/medium", "stm32-device-signature/stm32f1"] # косяк либы, для f103 не включена поддержка таймера 4
+stm32f103 = ["stm32f1xx-hal/stm32f103", "stm32f1xx-hal/medium", "stm32-device-signature/stm32f1"]
 
 # defmt: do NOT modify these features
 #defmt-default = []

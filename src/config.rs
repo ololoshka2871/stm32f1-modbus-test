@@ -1,6 +1,6 @@
 //-----------------------------------------------------------------------------
 
-pub const MB_DEV_ID: u16 = 0xDB65;
+pub const MB_DEV_ID: u16 = 0xDBFB;
 pub const RS485_BOUD_RATE: u32 = 57_600;
 pub const MODBUS_ADDR: u8 = 1;
 

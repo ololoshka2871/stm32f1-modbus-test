@@ -9,4 +9,5 @@
 [_] Modbus
     [v] Порт на Rust
     [v] Карта памяти
-    [_] GUI
+    [v] GUI
+    [_] RE/DE
