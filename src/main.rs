@@ -209,9 +209,10 @@ mod app {
 
         ctx.shared.rtu.lock(|rtu| rtu.pool());
 
-        let target_pwm_values = ctx.local.data.process();
-        update_pca9685_channels(&target_pwm_values.0[0..15]);
-        update_pwm_channels(&target_pwm_values.0[16..19]);
+        if let Some(target_pwm_values) = ctx.local.data.process() {
+            update_pca9685_channels(&target_pwm_values.0[0..15]);
+            update_pwm_channels(&target_pwm_values.0[16..19]);
+        }
 
         ctx.shared.rtu.lock(|rtu| rtu.pool());
     }
@@ -229,7 +230,12 @@ pub fn update_pca9685_channels(_targets: &[u32]) {}
 pub fn update_pwm_channels(_targets: &[u32]) {}
 
 impl pwm_ctrl_ext::PWMCtrlExt<20> for support::DataStorage {
-    fn process(&mut self) -> pwm_ctrl_ext::PWMValues<20> {
-        pwm_ctrl_ext::PWMValues([0u32; 20])
+    fn process(&mut self) -> Option<pwm_ctrl_ext::PWMValues<20>> {
+        if self.modified {
+            self.modified = false;
+            Some(pwm_ctrl_ext::PWMValues([0u32; 20]))
+        } else {
+            None
+        }
     }
 }

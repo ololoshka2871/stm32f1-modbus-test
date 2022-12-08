@@ -14,6 +14,8 @@ pub struct DataStorage {
 
     pub total_load: u16,
     pub chank_load: [u16; 10],
+
+    pub modified: bool,
 }
 
 impl DataStorage {
@@ -23,6 +25,7 @@ impl DataStorage {
             channels_target: Default::default(),
             total_load: 0,
             chank_load: Default::default(),
+            modified: false,
         }
     }
 }
@@ -81,6 +84,8 @@ impl libremodbus_rs::DataInterface for DataStorage {
                             .map_err(|_| MbError::MB_EIO)?;
                     }
                     0x0010..=0x0013 => {
+                        // Device HW version
+                        // MCU ID code
                         if (reg_addr - 0x0010 + reg_num) as usize > 2 * size_of::<u32>() {
                             Err(MbError::MB_ENOREG)?;
                         }
@@ -165,7 +170,52 @@ impl libremodbus_rs::DataInterface for DataStorage {
                 }
                 Ok(())
             }
-            AccessMode::WRITE => Err(MbError::MB_EINVAL),
+            AccessMode::WRITE => {
+                match reg_addr {
+                    0x0100..=0x0113 => {
+                        // channels duty
+                        if (reg_addr - 0x0100 + reg_num) as usize > 20 {
+                            Err(MbError::MB_ENOREG)?;
+                        }
+
+                        let offset = &mut 0;
+                        for reg in (reg_addr - 0x0100)..(reg_addr - 0x0100 + reg_num) {
+                            let v = reg_buff
+                                .read_with::<u16>(offset, BE)
+                                .map_err(|_| MbError::MB_EIO)?;
+                            if v <= (1 << 12) - 1
+                            /* 4095 */
+                            {
+                                self.channels_target[reg as usize] = v;
+                            } else {
+                                return Err(MbError::MB_EINVAL);
+                            }
+                        }
+                        self.modified = true;
+                        return Ok(());
+                    }
+                    0x0200 => {
+                        // PWM freq
+                        if reg_num > 1 {
+                            Err(MbError::MB_ENOREG)?;
+                        }
+                        let f = reg_buff
+                            .read_with::<u16>(&mut 0, BE)
+                            .map_err(|_| MbError::MB_EIO)?
+                            .into();
+                        if f >= crate::config::MIN_PWM_FREQ && f <= crate::config::MAX_PWM_FREQ {
+                            self.pwm_base_freq = Hertz::Hz(f);
+                            self.modified = true;
+                            return Ok(());
+                        } else {
+                            return Err(MbError::MB_EINVAL);
+                        }
+                    }
+                    _ => {}
+                }
+
+                Err(MbError::MB_EINVAL)
+            }
         }
     }
 }
