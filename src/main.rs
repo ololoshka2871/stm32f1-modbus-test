@@ -19,6 +19,8 @@ use stm32f1xx_hal::pac::{TIM2, USART2};
 use stm32f1xx_hal::serial::{Config, Serial};
 use stm32f1xx_hal::timer::CounterUs;
 
+use libremodbus_rs::MBInterface;
+
 use systick_monotonic::Systick;
 
 //-----------------------------------------------------------------------------
@@ -136,57 +138,89 @@ mod app {
 
     //-------------------------------------------------------------------------
 
-    #[idle(shared = [rtu], local = [data])]
+    #[idle(shared = [rtu])]
     fn idle(mut ctx: idle::Context) -> ! {
-        use libremodbus_rs::MBInterface;
-        use pwm_ctrl_ext::PWMCtrlExt;
-
-        if !ctx.shared.rtu.lock(|rtu| rtu.enable()) {
-            panic!("Failed to enable modbus");
-        }
+        assert!(ctx.shared.rtu.lock(|rtu| rtu.enable()));
         loop {
-            ctx.shared.rtu.lock(|rtu| rtu.pool());
-
-            let target_pwm_values = ctx.local.data.process();
-            update_pca9685_channels(&target_pwm_values.0[0..15]);
-            update_pwm_channels(&target_pwm_values.0[16..19]);
-
             cortex_m::asm::wfi();
         }
     }
 
     //-------------------------------------------------------------------------
 
-    #[task(binds = USART2, shared = [rtu], local = [led])]
+    #[task(binds = USART2, shared = [rtu], local = [led], priority = 3)]
     fn usart2_tx(mut ctx: usart2_tx::Context) {
+        use libremodbus_rs::REDEControl;
         use libremodbus_rs::SerialEvent;
+        use systick_monotonic::*;
 
-        let _ = ctx.local.led.set_high();
-        ctx.shared.rtu.lock(|rtu| {
+        //let _ = ctx.local.led.set_high();
+        let do_poll = ctx.shared.rtu.lock(|rtu| {
             let sr = unsafe { (*USART2::ptr()).sr.read() };
             let cr = unsafe { (*USART2::ptr()).cr1.read() };
 
             if sr.txe().bit_is_set() && cr.txeie().bit_is_set() {
-                rtu.on_tx();
+                let res = rtu.on_tx();
+                if rtu.is_tx_finished() {
+                    re_de_finaliser::spawn_after(
+                        (libm::ceilf(
+                            support::WAIT_BITS_AFTER_TX_DONE as f32 * 1_000.0
+                                / config::RS485_BOUD_RATE as f32,
+                        ) as u64)
+                            .millis(),
+                    )
+                    .unwrap();
+                }
+                return res;
             }
 
             if sr.rxne().bit_is_set() && cr.rxneie().bit_is_set() {
-                rtu.on_rx();
+                return rtu.on_rx();
             }
+            false
         });
-        let _ = ctx.local.led.set_low();
+        //let _ = ctx.local.led.set_low();
+
+        if do_poll {
+            modbus_pooler::spawn().unwrap();
+        }
     }
 
-    #[task(binds = TIM2, shared = [rtu], local = [/*led*/])]
+    #[task(binds = TIM2, shared = [rtu], local = [/*led*/], priority = 3)]
     fn tim2(mut ctx: tim2::Context) {
         use libremodbus_rs::MBTimerEvent;
 
         //let _ = ctx.local.led.set_high();
-        ctx.shared.rtu.lock(|rtu| {
-            rtu.on_timer();
+        let do_poll = ctx.shared.rtu.lock(|rtu| {
+            let res = rtu.on_timer();
             unsafe { (*TIM2::ptr()).sr.modify(|_, w| w.uif().clear_bit()) };
+            res
         });
         //let _ = ctx.local.led.set_low();
+
+        if do_poll {
+            modbus_pooler::spawn().unwrap();
+        }
+    }
+
+    #[task(shared= [rtu], local = [data])]
+    fn modbus_pooler(mut ctx: modbus_pooler::Context) {
+        use pwm_ctrl_ext::PWMCtrlExt;
+
+        ctx.shared.rtu.lock(|rtu| rtu.pool());
+
+        let target_pwm_values = ctx.local.data.process();
+        update_pca9685_channels(&target_pwm_values.0[0..15]);
+        update_pwm_channels(&target_pwm_values.0[16..19]);
+
+        ctx.shared.rtu.lock(|rtu| rtu.pool());
+    }
+
+    #[task(shared = [rtu])]
+    fn re_de_finaliser(mut ctx: re_de_finaliser::Context) {
+        use libremodbus_rs::REDEControl;
+
+        ctx.shared.rtu.lock(|rtu| rtu.deassert_re_de());
     }
 }
 

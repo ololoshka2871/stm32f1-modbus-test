@@ -1,7 +1,10 @@
 use core::convert::Infallible;
 
 use cortex_m::prelude::{_embedded_hal_serial_Read, _embedded_hal_serial_Write};
+use stm32f1xx_hal::device::USART2;
 use stm32f1xx_hal::{rcc::Clocks, serial::Event};
+
+pub const WAIT_BITS_AFTER_TX_DONE: u32 = 10;
 
 pub struct Serial<SER, PIN> {
     serial: SER,
@@ -20,7 +23,7 @@ impl<SER, PIN> Serial<SER, PIN> {
 }
 
 impl<PIN, P1, P2> libremodbus_rs::SerialInterface
-    for Serial<stm32f1xx_hal::serial::Serial<stm32f1xx_hal::device::USART2, (P1, P2)>, PIN>
+    for Serial<stm32f1xx_hal::serial::Serial<USART2, (P1, P2)>, PIN>
 where
     PIN: embedded_hal::digital::v2::OutputPin<Error = Infallible>,
 {
@@ -28,7 +31,8 @@ where
         use libremodbus_rs::Parity as MbParity;
         use stm32f1xx_hal::serial::{Parity, WordLength};
 
-        self.serial
+        if self
+            .serial
             .reconfigure(
                 stm32f1xx_hal::serial::Config::default()
                     .baudrate(stm32f1xx_hal::time::Bps(boud))
@@ -44,7 +48,13 @@ where
                     }),
                 self.clocks,
             )
-            .is_ok()
+            .is_err()
+        {
+            return false;
+        }
+        unsafe { (*USART2::ptr()).cr3.modify(|_, w| w.rtse().set_bit()) };
+
+        true
     }
 
     fn close(&mut self) {
@@ -66,7 +76,6 @@ where
             let _ = self.re_de.set_high();
         } else {
             self.serial.unlisten(Event::Txe);
-            let _ = self.re_de.set_low();
         }
     }
 
@@ -79,5 +88,9 @@ where
 
     fn put_byte(&mut self, data: u8) -> bool {
         self.serial.write(data).is_ok()
+    }
+
+    fn deassert_re_de(&mut self) {
+        let _ = self.re_de.set_low();
     }
 }

@@ -6,8 +6,10 @@
 [_] PWM 4 канала
 [_] PWM pca9685 
 
-[_] Modbus
+[v] Modbus
     [v] Порт на Rust
     [v] Карта памяти
     [v] GUI
-    [_] RE/DE
+    [v] RE/DE
+
+[_] Вычисления
