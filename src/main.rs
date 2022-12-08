@@ -4,6 +4,7 @@
 #![feature(macro_metavar_expr)]
 
 mod config;
+mod pwm_ctrl_ext;
 mod support;
 
 use panic_abort as _;
@@ -34,6 +35,7 @@ mod app {
     #[local]
     struct Local {
         led: PA5<Output<PushPull>>,
+        data: &'static mut support::DataStorage,
     }
 
     #[monotonic(binds = SysTick, default = true)]
@@ -122,20 +124,32 @@ mod app {
             .pa5
             .into_push_pull_output_with_state(&mut gpioa.crl, stm32f1xx_hal::gpio::PinState::Low);
 
-        (Shared { rtu }, Local { led }, init::Monotonics(mono))
+        (
+            Shared { rtu },
+            Local {
+                led,
+                data: unsafe { DATA_STORAGE.as_mut().unwrap_unchecked() },
+            },
+            init::Monotonics(mono),
+        )
     }
 
     //-------------------------------------------------------------------------
 
-    #[idle(shared = [rtu])]
+    #[idle(shared = [rtu], local = [data])]
     fn idle(mut ctx: idle::Context) -> ! {
         use libremodbus_rs::MBInterface;
+        use pwm_ctrl_ext::PWMCtrlExt;
 
         if !ctx.shared.rtu.lock(|rtu| rtu.enable()) {
             panic!("Failed to enable modbus");
         }
         loop {
             ctx.shared.rtu.lock(|rtu| rtu.pool());
+
+            let target_pwm_values = ctx.local.data.process();
+            update_pca9685_channels(&target_pwm_values.0[0..15]);
+            update_pwm_channels(&target_pwm_values.0[16..19]);
 
             cortex_m::asm::wfi();
         }
@@ -173,5 +187,15 @@ mod app {
             unsafe { (*TIM2::ptr()).sr.modify(|_, w| w.uif().clear_bit()) };
         });
         //let _ = ctx.local.led.set_low();
+    }
+}
+
+pub fn update_pca9685_channels(_targets: &[u32]) {}
+
+pub fn update_pwm_channels(_targets: &[u32]) {}
+
+impl pwm_ctrl_ext::PWMCtrlExt<20> for support::DataStorage {
+    fn process(&mut self) -> pwm_ctrl_ext::PWMValues<20> {
+        pwm_ctrl_ext::PWMValues([0u32; 20])
     }
 }

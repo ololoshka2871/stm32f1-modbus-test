@@ -50,7 +50,6 @@ Address | Data Type | Size (cells) | Access | Description
 0x0010  | Uint32    | 2            | R0     | Device HW version
 0x0012  | Uint32    | 2            | R0     | MCU ID code
 0x0020  | Uint32    | 2            | R0     | Device SW version
-0x0022  | Uint32    | 2            | R0     | Git HASH
 0x0100  | Uint16    | 1            | RW     | Channel 1 Duty (0-4095)
 0x0101  | Uint16    | 1            | RW     | Channel 2 Duty (0-4095)
 0x0102  | Uint16    | 1            | RW     | Channel 3 Duty (0-4095)
@@ -76,14 +75,14 @@ Address | Data Type | Size (cells) | Access | Description
 ## Input registers
 Address | Data Type | Size (cells) | Description 
 -------:|:----------|:-------------|:---------------------
-0x0000  | Float     | 2            | Total output load (%)
-0x0100  | Float     | 2            | Total load 0-10 (%)
-0x0102  | Float     | 2            | Total load 11-20 (%)
-0x0104  | Float     | 2            | Total load 21-30 (%)
-0x0106  | Float     | 2            | Total load 31-40 (%)
-0x0108  | Float     | 2            | Total load 41-50 (%)
-0x010A  | Float     | 2            | Total load 51-60 (%)
-0x010C  | Float     | 2            | Total load 61-70 (%)
-0x010E  | Float     | 2            | Total load 71-80 (%)
-0x0100  | Float     | 2            | Total load 81-90 (%)
-0x0110  | Float     | 2            | Total load 91-100 (%)
+0x0000  | Uint16    | 1            | Total output load (%)
+0x0100  | Uint16    | 1            | Total load 0-10 (%)
+0x0102  | Uint16    | 1            | Total load 11-20 (%)
+0x0104  | Uint16    | 1            | Total load 21-30 (%)
+0x0106  | Uint16    | 1            | Total load 31-40 (%)
+0x0108  | Uint16    | 1            | Total load 41-50 (%)
+0x010A  | Uint16    | 1            | Total load 51-60 (%)
+0x010C  | Uint16    | 1            | Total load 61-70 (%)
+0x010E  | Uint16    | 1            | Total load 71-80 (%)
+0x0100  | Uint16    | 1            | Total load 81-90 (%)
+0x0110  | Uint16    | 1            | Total load 91-100 (%)
