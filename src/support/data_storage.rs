@@ -183,7 +183,7 @@ impl libremodbus_rs::DataInterface for DataStorage {
                             let v = reg_buff
                                 .read_with::<u16>(offset, BE)
                                 .map_err(|_| MbError::MB_EIO)?;
-                            if v <= (1 << 12) - 1
+                            if v < (1 << 12)
                             /* 4095 */
                             {
                                 self.channels_target[reg as usize] = v;

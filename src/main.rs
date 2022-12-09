@@ -4,8 +4,8 @@
 #![feature(macro_metavar_expr)]
 
 mod config;
-mod pwm_ctrl_ext;
 mod support;
+mod pwm;
 
 use panic_abort as _;
 use rtic::app;
@@ -205,7 +205,7 @@ mod app {
 
     #[task(shared= [rtu], local = [data])]
     fn modbus_pooler(mut ctx: modbus_pooler::Context) {
-        use pwm_ctrl_ext::PWMCtrlExt;
+        use pwm::PWMCtrlExt;
 
         ctx.shared.rtu.lock(|rtu| rtu.pool());
 
@@ -228,14 +228,3 @@ mod app {
 pub fn update_pca9685_channels(_targets: &[u32]) {}
 
 pub fn update_pwm_channels(_targets: &[u32]) {}
-
-impl pwm_ctrl_ext::PWMCtrlExt<20> for support::DataStorage {
-    fn process(&mut self) -> Option<pwm_ctrl_ext::PWMValues<20>> {
-        if self.modified {
-            self.modified = false;
-            Some(pwm_ctrl_ext::PWMValues([0u32; 20]))
-        } else {
-            None
-        }
-    }
-}

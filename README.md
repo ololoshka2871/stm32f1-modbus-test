@@ -24,8 +24,8 @@ $ cargo build
 ![](img/mcu_conn.png)
 
 ### pca9685's 16 channels 
-* CH 1-8 - "прямые"
-* CH 9-16 - "инверсные"
+* CH 0-3, 8-11 - "прямые"
+* CH 4-7, 12-15 - "инверсные"
 
 ### MCU's channels
 * CH1 (PA7) - "инверсный"
