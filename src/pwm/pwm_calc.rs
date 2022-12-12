@@ -1,8 +1,10 @@
+use fugit_timer::HertzU32;
+
 use super::{pwm_ctrl_ext::PWMValues, PWMChannelId, PWMCtrlExt, Position};
 use crate::support;
 
 impl PWMCtrlExt<20> for support::DataStorage {
-    fn process(&mut self, channels: &[&dyn PWMChannelId; 20]) -> Option<PWMValues<20>> {
+    fn process(&mut self, channels: &[&dyn PWMChannelId; 20]) -> Option<(PWMValues<20>, HertzU32)> {
         fn f((i, chank): (usize, &mut f32), ch_target: u32, chank_len: u32) {
             let chank_start = i as u32 * chank_len;
             let chank_end = chank_start + chank_len;
@@ -58,7 +60,7 @@ impl PWMCtrlExt<20> for support::DataStorage {
                 (100 * self.chank_load.len()) as f32,
             );
 
-            Some(res)
+            Some((res, self.pwm_base_freq))
         } else {
             None
         }

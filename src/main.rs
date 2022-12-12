@@ -13,17 +13,17 @@ use rtic::app;
 use stm32f1xx_hal::afio::AfioExt;
 use stm32f1xx_hal::flash::FlashExt;
 use stm32f1xx_hal::gpio::{
-    Alternate, Floating, GpioExt, Input, Output, PushPull, PA1, PA2, PA3, PA5,
+    Alternate, Floating, GpioExt, Input, Output, PushPull, PA1, PA10, PA11, PA2, PA3, PA5, PA8, PA9,
 };
-use stm32f1xx_hal::pac::{TIM2, USART2};
+use stm32f1xx_hal::pac::{TIM1, TIM2, USART2};
 use stm32f1xx_hal::serial::{Config, Serial};
-use stm32f1xx_hal::timer::CounterUs;
+use stm32f1xx_hal::timer::{Ch, Channel, CounterUs, PwmHz, Tim1NoRemap};
 
 use libremodbus_rs::MBInterface;
 
 use systick_monotonic::Systick;
 
-use pwm::{NativeCh, PCA9685Ch, PWMChannelId, Position};
+use pwm::{NativeCh, PCA9685Ch, PWMChannelId, PWMValues, Position};
 
 //-----------------------------------------------------------------------------
 
@@ -41,6 +41,18 @@ mod app {
         led: PA5<Output<PushPull>>,
         data: &'static mut support::DataStorage,
         pwm: [&'static mut dyn PWMChannelId; 20],
+
+        native_pwm: PwmHz<
+            TIM1,
+            Tim1NoRemap,
+            (Ch<0>, Ch<1>, Ch<2>, Ch<3>),
+            (
+                PA8<Alternate<PushPull>>,
+                PA9<Alternate<PushPull>>,
+                PA10<Alternate<PushPull>>,
+                PA11<Alternate<PushPull>>,
+            ),
+        >,
     }
 
     #[monotonic(binds = SysTick, default = true)]
@@ -51,7 +63,9 @@ mod app {
         use stm32f1xx_hal::prelude::_fugit_RateExtU32;
         use stm32f1xx_hal::prelude::_stm32_hal_rcc_RccExt;
         use stm32f1xx_hal::prelude::_stm32_hal_time_U32Ext;
+        use stm32f1xx_hal::prelude::_stm32f4xx_hal_timer_PwmExt;
         use stm32f1xx_hal::prelude::_stm32f4xx_hal_timer_TimerExt;
+        use stm32f1xx_hal::timer::Tim1NoRemap;
 
         static mut UART2: Option<
             support::Serial<
@@ -71,8 +85,8 @@ mod app {
         let mut flash = ctx.device.FLASH.constrain();
 
         let mut gpioa = ctx.device.GPIOA.split();
+        //let mut gpiob = ctx.device.GPIOB.split();
         /*
-        let mut gpiob = ctx.device.GPIOB.split();
         let mut gpioc = ctx.device.GPIOC.split();
         */
         let mut afio = ctx.device.AFIO.constrain();
@@ -129,6 +143,26 @@ mod app {
         };
 
         //---------------------------------------------------------------------
+        let p0r = gpioa.pa8.into_alternate_push_pull(&mut gpioa.crh);
+        let p1r = gpioa.pa9.into_alternate_push_pull(&mut gpioa.crh);
+        let p2l = gpioa.pa10.into_alternate_push_pull(&mut gpioa.crh);
+        let p3l = gpioa.pa11.into_alternate_push_pull(&mut gpioa.crh);
+
+        let mut native_pwm = ctx.device.TIM1.pwm_hz::<Tim1NoRemap, _, _>(
+            (p0r, p1r, p2l, p3l),
+            &mut afio.mapr,
+            20.kHz(),
+            &clocks,
+        );
+
+        native_pwm.set_duty(Channel::C1, 0);
+        native_pwm.enable(Channel::C1);
+        native_pwm.set_duty(Channel::C2, 0);
+        native_pwm.enable(Channel::C2);
+        native_pwm.set_duty(Channel::C3, native_pwm.get_duty(Channel::C3));
+        native_pwm.enable(Channel::C3);
+        native_pwm.set_duty(Channel::C4, native_pwm.get_duty(Channel::C4));
+        native_pwm.enable(Channel::C4);
 
         let pwm: [&'static mut dyn PWMChannelId; 20] = unsafe {
             PCA9685_PWM_CHANNELS.replace([
@@ -197,6 +231,7 @@ mod app {
                 led,
                 data: unsafe { DATA_STORAGE.as_mut().unwrap_unchecked() },
                 pwm,
+                native_pwm,
             },
             init::Monotonics(mono),
         )
@@ -269,19 +304,41 @@ mod app {
         }
     }
 
-    #[task(shared= [rtu], local = [data, pwm])]
+    #[task(shared= [rtu], local = [data, pwm, native_pwm])]
     fn modbus_pooler(mut ctx: modbus_pooler::Context) {
         use pwm::PWMCtrlExt;
 
         ctx.shared.rtu.lock(|rtu| rtu.pool());
 
-        if let Some(target_pwm_values) = ctx
+        if let Some((target_pwm_values, target_pwm_freq)) = ctx
             .local
             .data
             .process(unsafe { core::mem::transmute(ctx.local.pwm) })
         {
             update_pca9685_channels(&target_pwm_values.0[0..15]);
-            update_pwm_channels(&target_pwm_values.0[16..19]);
+
+            //update_native_pwm_channels(ctx.local.native_pwm_channels, &target_pwm_values.0[16..19]);
+
+            //-----------------------------------------------------------------
+
+            let native_pwm = ctx.local.native_pwm;
+            native_pwm.set_period(target_pwm_freq);
+            let mut set_native_channel_duty =
+                move |channel: Channel, target_pwm_values: &PWMValues<20>, cnannel_id| {
+                    native_pwm.set_duty(
+                        channel,
+                        target_pwm_values.as_range(
+                            cnannel_id,
+                            config::MAX_PWM_VAL,
+                            native_pwm.get_max_duty(),
+                        ),
+                    );
+                };
+
+            set_native_channel_duty(Channel::C1, &target_pwm_values, 16);
+            set_native_channel_duty(Channel::C2, &target_pwm_values, 17);
+            set_native_channel_duty(Channel::C3, &target_pwm_values, 18);
+            set_native_channel_duty(Channel::C4, &target_pwm_values, 19);
         }
 
         ctx.shared.rtu.lock(|rtu| rtu.pool());
@@ -296,5 +353,3 @@ mod app {
 }
 
 pub fn update_pca9685_channels(_targets: &[u16]) {}
-
-pub fn update_pwm_channels(_targets: &[u16]) {}

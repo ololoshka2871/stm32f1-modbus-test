@@ -1,7 +1,7 @@
 mod pwm_calc;
 mod pwm_ctrl_ext;
 
-pub use pwm_ctrl_ext::PWMCtrlExt;
+pub use pwm_ctrl_ext::{PWMCtrlExt, PWMValues};
 
 mod pwm_channel;
 pub use pwm_channel::{PWMChannelId, Position};
