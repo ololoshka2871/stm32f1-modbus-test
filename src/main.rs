@@ -148,6 +148,7 @@ mod app {
         let p2l = gpioa.pa10.into_alternate_push_pull(&mut gpioa.crh);
         let p3l = gpioa.pa11.into_alternate_push_pull(&mut gpioa.crh);
 
+        let tim1 = unsafe { &*TIM1::ptr() };
         let mut native_pwm = ctx.device.TIM1.pwm_hz::<Tim1NoRemap, _, _>(
             (p0r, p1r, p2l, p3l),
             &mut afio.mapr,
@@ -155,13 +156,15 @@ mod app {
             &clocks,
         );
 
-        native_pwm.set_duty(Channel::C1, 0);
+        // revers polarity for channels 1 and 2
+        tim1.ccer.modify(|_, w| w.cc1p().set_bit().cc2p().set_bit());
+        native_pwm.set_duty(Channel::C1, native_pwm.get_duty(Channel::C1));
         native_pwm.enable(Channel::C1);
-        native_pwm.set_duty(Channel::C2, 0);
+        native_pwm.set_duty(Channel::C2, native_pwm.get_duty(Channel::C2));
         native_pwm.enable(Channel::C2);
-        native_pwm.set_duty(Channel::C3, native_pwm.get_duty(Channel::C3));
+        native_pwm.set_duty(Channel::C3, 0);
         native_pwm.enable(Channel::C3);
-        native_pwm.set_duty(Channel::C4, native_pwm.get_duty(Channel::C4));
+        native_pwm.set_duty(Channel::C4, 0);
         native_pwm.enable(Channel::C4);
 
         let pwm: [&'static mut dyn PWMChannelId; 20] = unsafe {
@@ -324,21 +327,25 @@ mod app {
             let native_pwm = ctx.local.native_pwm;
             native_pwm.set_period(target_pwm_freq);
             let mut set_native_channel_duty =
-                move |channel: Channel, target_pwm_values: &PWMValues<20>, cnannel_id| {
+                move |channel: Channel,
+                      target_pwm_values: &PWMValues<20>,
+                      cnannel_id,
+                      is_inverted: bool| {
                     native_pwm.set_duty(
                         channel,
                         target_pwm_values.as_range(
                             cnannel_id,
                             config::MAX_PWM_VAL,
                             native_pwm.get_max_duty(),
+                            is_inverted,
                         ),
                     );
                 };
 
-            set_native_channel_duty(Channel::C1, &target_pwm_values, 16);
-            set_native_channel_duty(Channel::C2, &target_pwm_values, 17);
-            set_native_channel_duty(Channel::C3, &target_pwm_values, 18);
-            set_native_channel_duty(Channel::C4, &target_pwm_values, 19);
+            set_native_channel_duty(Channel::C1, &target_pwm_values, 16, true);
+            set_native_channel_duty(Channel::C2, &target_pwm_values, 17, true);
+            set_native_channel_duty(Channel::C3, &target_pwm_values, 18, false);
+            set_native_channel_duty(Channel::C4, &target_pwm_values, 19, false);
         }
 
         ctx.shared.rtu.lock(|rtu| rtu.pool());

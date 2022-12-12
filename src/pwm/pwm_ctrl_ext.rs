@@ -10,9 +10,21 @@ pub trait PWMCtrlExt<const N: usize> {
 }
 
 impl<const N: usize> PWMValues<N> {
-    pub fn as_range(&self, channel: usize, src_resolution: u16, target_resolution: u16) -> u16 {
+    pub fn as_range(
+        &self,
+        channel: usize,
+        src_resolution: u16,
+        target_resolution: u16,
+        is_inverted: bool,
+    ) -> u16 {
         assert!(channel < N);
 
-        roundf(self.0[channel] as f32 / src_resolution as f32 * target_resolution as f32) as u16
+        let res = roundf(self.0[channel] as f32 / src_resolution as f32 * target_resolution as f32)
+            as u16;
+        if is_inverted {
+            target_resolution - res
+        } else {
+            res
+        }
     }
 }
