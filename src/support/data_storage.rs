@@ -12,8 +12,8 @@ pub struct DataStorage {
     pub pwm_base_freq: Hertz,
     pub channels_target: [u16; 20],
 
-    pub total_load: u32,
-    pub chank_load: [u32; 10],
+    pub total_load: f32,
+    pub chank_load: [f32; 10],
 
     pub modified: bool,
 }
@@ -23,7 +23,7 @@ impl DataStorage {
         Self {
             pwm_base_freq: Hz(1000u32),
             channels_target: Default::default(),
-            total_load: 0,
+            total_load: 0.0,
             chank_load: Default::default(),
             modified: false,
         }

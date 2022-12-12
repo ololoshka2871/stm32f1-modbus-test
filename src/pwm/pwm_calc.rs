@@ -3,16 +3,18 @@ use crate::support;
 
 impl PWMCtrlExt<20> for support::DataStorage {
     fn process(&mut self, channels: &[&dyn PWMChannelId; 20]) -> Option<PWMValues<20>> {
-        fn f((i, chank): (usize, &mut u32), ch_target: u32, chank_len: u32) {
+        fn f((i, chank): (usize, &mut f32), ch_target: u32, chank_len: u32) {
             let chank_start = i as u32 * chank_len;
             let chank_end = chank_start + chank_len;
-            *chank += if ch_target > chank_end {
+            let load = if ch_target > chank_end {
                 chank_len
             } else if ch_target > chank_start {
                 ch_target - chank_start
             } else {
                 0
             };
+
+            *chank += support::map(load as f32, 0.0, chank_len as f32, 0.0, 100.0);
         }
 
         if self.modified {
@@ -23,7 +25,7 @@ impl PWMCtrlExt<20> for support::DataStorage {
             let chank_len =
                 ((crate::config::MAX_PWM_VAL + 1) as usize / self.chank_load.len()) as u32;
 
-            self.chank_load.fill(0); // reset load
+            self.chank_load.fill(0.0); // reset load
 
             let mut total_load = 0;
             channels.iter().for_each(|ch| {
@@ -48,7 +50,13 @@ impl PWMCtrlExt<20> for support::DataStorage {
                 }
             });
 
-            self.total_load = total_load;
+            self.total_load = support::map(
+                total_load as f32,
+                0.0,
+                (crate::config::MAX_PWM_VAL as usize * self.chank_load.len()) as f32,
+                0.0,
+                (100 * self.chank_load.len()) as f32,
+            );
 
             Some(res)
         } else {
