@@ -16,3 +16,4 @@ pub const HW_VERSION: u32 = 0x00000001;
 
 pub const MIN_PWM_FREQ: u32 = 50;
 pub const MAX_PWM_FREQ: u32 = 20_000;
+pub const MAX_PWM_VAL: u16 = (1 << 12) - 1;

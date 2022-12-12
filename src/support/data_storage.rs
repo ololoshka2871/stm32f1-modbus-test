@@ -12,8 +12,8 @@ pub struct DataStorage {
     pub pwm_base_freq: Hertz,
     pub channels_target: [u16; 20],
 
-    pub total_load: u16,
-    pub chank_load: [u16; 10],
+    pub total_load: u32,
+    pub chank_load: [u32; 10],
 
     pub modified: bool,
 }
@@ -38,24 +38,33 @@ impl libremodbus_rs::DataInterface for DataStorage {
         reg_num: u16,
     ) -> Result<(), MbError> {
         match reg_addr {
-            0x0000 => {
+            0x0000 | 0x0001 => {
                 // total_load
-                if reg_num < 2 {
-                    return reg_buff
-                        .write_with::<u16>(&mut 0, self.total_load, BE)
-                        .map_err(|_| MbError::MB_EIO);
+                if (reg_num as usize) <= size_of::<u32>() / size_of::<u16>() {
+                    return write_buf(
+                        reg_buff,
+                        self.total_load
+                            .split_2u16()
+                            .iter()
+                            .skip(reg_addr as usize)
+                            .take(reg_num as usize)
+                            .copied(),
+                    );
                 }
             }
-            0x100..=0x109 => {
+            0x100..=0x0113 => {
                 // chank_load
-                if reg_addr - 0x0100 + reg_num <= 0x109 {
+                if (reg_addr - 0x100 + reg_num) as usize
+                    <= size_of::<u32>() / size_of::<u16>() * self.chank_load.len()
+                {
                     return write_buf(
                         reg_buff,
                         self.chank_load
                             .iter()
+                            .map(|v| v.split_2u16())
+                            .flatten()
                             .skip(reg_addr as usize - 0x100)
-                            .take(reg_num as usize)
-                            .copied(),
+                            .take(reg_num as usize),
                     );
                 }
             }
@@ -183,9 +192,7 @@ impl libremodbus_rs::DataInterface for DataStorage {
                             let v = reg_buff
                                 .read_with::<u16>(offset, BE)
                                 .map_err(|_| MbError::MB_EIO)?;
-                            if v < (1 << 12)
-                            /* 4095 */
-                            {
+                            if v <= crate::config::MAX_PWM_VAL {
                                 self.channels_target[reg as usize] = v;
                             } else {
                                 return Err(MbError::MB_EINVAL);

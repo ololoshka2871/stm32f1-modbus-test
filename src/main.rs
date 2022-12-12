@@ -4,8 +4,8 @@
 #![feature(macro_metavar_expr)]
 
 mod config;
-mod support;
 mod pwm;
+mod support;
 
 use panic_abort as _;
 use rtic::app;
@@ -23,6 +23,8 @@ use libremodbus_rs::MBInterface;
 
 use systick_monotonic::Systick;
 
+use pwm::{NativeCh, PCA9685Ch, PWMChannelId, Position};
+
 //-----------------------------------------------------------------------------
 
 #[app(device = stm32f1xx_hal::pac, peripherals = true, dispatchers = [RTCALARM])]
@@ -38,6 +40,7 @@ mod app {
     struct Local {
         led: PA5<Output<PushPull>>,
         data: &'static mut support::DataStorage,
+        pwm: [&'static mut dyn PWMChannelId; 20],
     }
 
     #[monotonic(binds = SysTick, default = true)]
@@ -59,6 +62,11 @@ mod app {
 
         static mut MODBUS_TIMER: Option<support::Timer<CounterUs<TIM2>>> = None;
         static mut DATA_STORAGE: Option<support::DataStorage> = None;
+
+        static mut NATIVE_PWM_CHANNELS: Option<[NativeCh; 4]> = None;
+        static mut PCA9685_PWM_CHANNELS: Option<[PCA9685Ch; 16]> = None;
+
+        //---------------------------------------------------------------------
 
         let mut flash = ctx.device.FLASH.constrain();
 
@@ -122,6 +130,63 @@ mod app {
 
         //---------------------------------------------------------------------
 
+        let pwm: [&'static mut dyn PWMChannelId; 20] = unsafe {
+            PCA9685_PWM_CHANNELS.replace([
+                PCA9685Ch::new(0, Position::LeftAligned),
+                PCA9685Ch::new(1, Position::LeftAligned),
+                PCA9685Ch::new(2, Position::LeftAligned),
+                PCA9685Ch::new(3, Position::LeftAligned),
+                PCA9685Ch::new(4, Position::RightAligend),
+                PCA9685Ch::new(5, Position::RightAligend),
+                PCA9685Ch::new(6, Position::RightAligend),
+                PCA9685Ch::new(7, Position::RightAligend),
+                PCA9685Ch::new(8, Position::LeftAligned),
+                PCA9685Ch::new(9, Position::LeftAligned),
+                PCA9685Ch::new(10, Position::LeftAligned),
+                PCA9685Ch::new(11, Position::LeftAligned),
+                PCA9685Ch::new(12, Position::RightAligend),
+                PCA9685Ch::new(13, Position::RightAligend),
+                PCA9685Ch::new(14, Position::RightAligend),
+                PCA9685Ch::new(15, Position::RightAligend),
+            ]);
+
+            NATIVE_PWM_CHANNELS.replace([
+                NativeCh::new(16, Position::RightAligend),
+                NativeCh::new(17, Position::RightAligend),
+                NativeCh::new(18, Position::LeftAligned),
+                NativeCh::new(19, Position::LeftAligned),
+            ]);
+
+            [
+                // +
+                &mut NATIVE_PWM_CHANNELS.as_mut().unwrap_unchecked()[2],
+                &mut PCA9685_PWM_CHANNELS.as_mut().unwrap_unchecked()[0],
+                &mut PCA9685_PWM_CHANNELS.as_mut().unwrap_unchecked()[1],
+                &mut PCA9685_PWM_CHANNELS.as_mut().unwrap_unchecked()[2],
+                &mut PCA9685_PWM_CHANNELS.as_mut().unwrap_unchecked()[3],
+                // -
+                &mut NATIVE_PWM_CHANNELS.as_mut().unwrap_unchecked()[0],
+                &mut PCA9685_PWM_CHANNELS.as_mut().unwrap_unchecked()[4],
+                &mut PCA9685_PWM_CHANNELS.as_mut().unwrap_unchecked()[5],
+                &mut PCA9685_PWM_CHANNELS.as_mut().unwrap_unchecked()[6],
+                &mut PCA9685_PWM_CHANNELS.as_mut().unwrap_unchecked()[7],
+                // +
+                &mut NATIVE_PWM_CHANNELS.as_mut().unwrap_unchecked()[3],
+                &mut PCA9685_PWM_CHANNELS.as_mut().unwrap_unchecked()[8],
+                &mut PCA9685_PWM_CHANNELS.as_mut().unwrap_unchecked()[9],
+                &mut PCA9685_PWM_CHANNELS.as_mut().unwrap_unchecked()[10],
+                &mut PCA9685_PWM_CHANNELS.as_mut().unwrap_unchecked()[11],
+                // -
+                &mut NATIVE_PWM_CHANNELS.as_mut().unwrap_unchecked()[1],
+                &mut PCA9685_PWM_CHANNELS.as_mut().unwrap_unchecked()[12],
+                &mut PCA9685_PWM_CHANNELS.as_mut().unwrap_unchecked()[13],
+                &mut PCA9685_PWM_CHANNELS.as_mut().unwrap_unchecked()[14],
+                &mut PCA9685_PWM_CHANNELS.as_mut().unwrap_unchecked()[15],
+            ]
+        };
+
+        //---------------------------------------------------------------------
+
         let led = gpioa
             .pa5
             .into_push_pull_output_with_state(&mut gpioa.crl, stm32f1xx_hal::gpio::PinState::Low);
@@ -131,6 +196,7 @@ mod app {
             Local {
                 led,
                 data: unsafe { DATA_STORAGE.as_mut().unwrap_unchecked() },
+                pwm,
             },
             init::Monotonics(mono),
         )
@@ -203,13 +269,17 @@ mod app {
         }
     }
 
-    #[task(shared= [rtu], local = [data])]
+    #[task(shared= [rtu], local = [data, pwm])]
     fn modbus_pooler(mut ctx: modbus_pooler::Context) {
         use pwm::PWMCtrlExt;
 
         ctx.shared.rtu.lock(|rtu| rtu.pool());
 
-        if let Some(target_pwm_values) = ctx.local.data.process() {
+        if let Some(target_pwm_values) = ctx
+            .local
+            .data
+            .process(unsafe { core::mem::transmute(ctx.local.pwm) })
+        {
             update_pca9685_channels(&target_pwm_values.0[0..15]);
             update_pwm_channels(&target_pwm_values.0[16..19]);
         }
@@ -225,6 +295,6 @@ mod app {
     }
 }
 
-pub fn update_pca9685_channels(_targets: &[u32]) {}
+pub fn update_pca9685_channels(_targets: &[u16]) {}
 
-pub fn update_pwm_channels(_targets: &[u32]) {}
+pub fn update_pwm_channels(_targets: &[u16]) {}
