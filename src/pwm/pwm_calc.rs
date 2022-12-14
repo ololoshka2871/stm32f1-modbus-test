@@ -21,8 +21,8 @@ impl PWMCtrlExt<20> for support::DataStorage {
 
         if self.modified {
             self.modified = false;
-            let mut res = PWMValues([0u16; 20]);
-            res.0.copy_from_slice(&self.channels_target);
+            let mut res = PWMValues::default();
+            res.values.copy_from_slice(&self.channels_target);
 
             let chank_len =
                 ((crate::config::MAX_PWM_VAL + 1) as usize / self.chank_load.len()) as u32;

@@ -13,10 +13,13 @@ use rtic::app;
 use stm32f1xx_hal::afio::AfioExt;
 use stm32f1xx_hal::flash::FlashExt;
 use stm32f1xx_hal::gpio::{
-    Alternate, Floating, GpioExt, Input, Output, PushPull, PA1, PA10, PA11, PA2, PA3, PA5, PA8, PA9,
+    Alternate, Floating, GpioExt, Input, OpenDrain, Output, PushPull, PA1, PA10, PA11, PA2, PA3,
+    PA5, PA8, PA9, PB6, PB7,
 };
-use stm32f1xx_hal::pac::{TIM1, TIM2, USART2};
+use stm32f1xx_hal::i2c::BlockingI2c;
+use stm32f1xx_hal::pac::{I2C1, TIM1, TIM2, USART2};
 use stm32f1xx_hal::serial::{Config, Serial};
+use stm32f1xx_hal::time::Hertz;
 use stm32f1xx_hal::timer::{Ch, Channel, CounterUs, PwmHz, Tim1NoRemap};
 
 use libremodbus_rs::MBInterface;
@@ -24,6 +27,9 @@ use libremodbus_rs::MBInterface;
 use systick_monotonic::Systick;
 
 use pwm::{NativeCh, PCA9685Ch, PWMChannelId, PWMValues, Position};
+
+use pwm_pca9685::Channel as PWMChannel;
+use pwm_pca9685::{Address, Pca9685};
 
 //-----------------------------------------------------------------------------
 
@@ -41,6 +47,7 @@ mod app {
         led: PA5<Output<PushPull>>,
         data: &'static mut support::DataStorage,
         pwm: [&'static mut dyn PWMChannelId; 20],
+        pac9685_channels: &'static mut [PCA9685Ch; 16],
 
         native_pwm: PwmHz<
             TIM1,
@@ -53,6 +60,7 @@ mod app {
                 PA11<Alternate<PushPull>>,
             ),
         >,
+        pac9685: Pca9685<BlockingI2c<I2C1, (PB6<Alternate<OpenDrain>>, PB7<Alternate<OpenDrain>>)>>,
     }
 
     #[monotonic(binds = SysTick, default = true)]
@@ -85,7 +93,7 @@ mod app {
         let mut flash = ctx.device.FLASH.constrain();
 
         let mut gpioa = ctx.device.GPIOA.split();
-        //let mut gpiob = ctx.device.GPIOB.split();
+        let mut gpiob = ctx.device.GPIOB.split();
         /*
         let mut gpioc = ctx.device.GPIOC.split();
         */
@@ -152,12 +160,14 @@ mod app {
         let mut native_pwm = ctx.device.TIM1.pwm_hz::<Tim1NoRemap, _, _>(
             (p0r, p1r, p2l, p3l),
             &mut afio.mapr,
-            20.kHz(),
+            config::MAX_PWM_FREQ.kHz(),
             &clocks,
         );
 
         // revers polarity for channels 1 and 2
         tim1.ccer.modify(|_, w| w.cc1p().set_bit().cc2p().set_bit());
+
+        // enable channels
         native_pwm.set_duty(Channel::C1, native_pwm.get_duty(Channel::C1));
         native_pwm.enable(Channel::C1);
         native_pwm.set_duty(Channel::C2, native_pwm.get_duty(Channel::C2));
@@ -169,22 +179,22 @@ mod app {
 
         let pwm: [&'static mut dyn PWMChannelId; 20] = unsafe {
             PCA9685_PWM_CHANNELS.replace([
-                PCA9685Ch::new(0, Position::LeftAligned),
-                PCA9685Ch::new(1, Position::LeftAligned),
-                PCA9685Ch::new(2, Position::LeftAligned),
-                PCA9685Ch::new(3, Position::LeftAligned),
-                PCA9685Ch::new(4, Position::RightAligend),
-                PCA9685Ch::new(5, Position::RightAligend),
-                PCA9685Ch::new(6, Position::RightAligend),
-                PCA9685Ch::new(7, Position::RightAligend),
-                PCA9685Ch::new(8, Position::LeftAligned),
-                PCA9685Ch::new(9, Position::LeftAligned),
-                PCA9685Ch::new(10, Position::LeftAligned),
-                PCA9685Ch::new(11, Position::LeftAligned),
-                PCA9685Ch::new(12, Position::RightAligend),
-                PCA9685Ch::new(13, Position::RightAligend),
-                PCA9685Ch::new(14, Position::RightAligend),
-                PCA9685Ch::new(15, Position::RightAligend),
+                PCA9685Ch::new(PWMChannel::C0, Position::LeftAligned),
+                PCA9685Ch::new(PWMChannel::C1, Position::LeftAligned),
+                PCA9685Ch::new(PWMChannel::C2, Position::LeftAligned),
+                PCA9685Ch::new(PWMChannel::C3, Position::LeftAligned),
+                PCA9685Ch::new(PWMChannel::C4, Position::RightAligend),
+                PCA9685Ch::new(PWMChannel::C5, Position::RightAligend),
+                PCA9685Ch::new(PWMChannel::C6, Position::RightAligend),
+                PCA9685Ch::new(PWMChannel::C7, Position::RightAligend),
+                PCA9685Ch::new(PWMChannel::C8, Position::LeftAligned),
+                PCA9685Ch::new(PWMChannel::C9, Position::LeftAligned),
+                PCA9685Ch::new(PWMChannel::C10, Position::LeftAligned),
+                PCA9685Ch::new(PWMChannel::C11, Position::LeftAligned),
+                PCA9685Ch::new(PWMChannel::C12, Position::RightAligend),
+                PCA9685Ch::new(PWMChannel::C13, Position::RightAligend),
+                PCA9685Ch::new(PWMChannel::C14, Position::RightAligend),
+                PCA9685Ch::new(PWMChannel::C15, Position::RightAligend),
             ]);
 
             NATIVE_PWM_CHANNELS.replace([
@@ -222,6 +232,31 @@ mod app {
             ]
         };
 
+        let scl = gpiob.pb6.into_alternate_open_drain(&mut gpiob.crl);
+        let sda = gpiob.pb7.into_alternate_open_drain(&mut gpiob.crl);
+
+        let i2c = BlockingI2c::i2c1(
+            ctx.device.I2C1,
+            (scl, sda),
+            &mut afio.mapr,
+            stm32f1xx_hal::i2c::Mode::Fast {
+                frequency: 400.kHz(),
+                duty_cycle: stm32f1xx_hal::i2c::DutyCycle::Ratio16to9,
+            },
+            clocks,
+            1000,
+            10,
+            1000,
+            1000,
+        );
+
+        let mut pac9685 = Pca9685::new(i2c, Address::default()).unwrap();
+
+        pac9685
+            .set_prescale(pac9685_prescaler(config::MAX_PWM_FREQ.Hz()))
+            .unwrap();
+        pac9685.enable().unwrap();
+
         //---------------------------------------------------------------------
 
         let led = gpioa
@@ -234,7 +269,9 @@ mod app {
                 led,
                 data: unsafe { DATA_STORAGE.as_mut().unwrap_unchecked() },
                 pwm,
+                pac9685_channels: unsafe { PCA9685_PWM_CHANNELS.as_mut().unwrap_unchecked() },
                 native_pwm,
+                pac9685,
             },
             init::Monotonics(mono),
         )
@@ -307,7 +344,7 @@ mod app {
         }
     }
 
-    #[task(shared= [rtu], local = [data, pwm, native_pwm])]
+    #[task(shared = [rtu], local = [data, pwm, pac9685_channels, native_pwm, pac9685])]
     fn modbus_pooler(mut ctx: modbus_pooler::Context) {
         use pwm::PWMCtrlExt;
 
@@ -318,9 +355,16 @@ mod app {
             .data
             .process(unsafe { core::mem::transmute(ctx.local.pwm) })
         {
-            update_pca9685_channels(&target_pwm_values.0[0..15]);
+            ctx.local
+                .pac9685
+                .set_prescale(pac9685_prescaler(target_pwm_freq))
+                .unwrap();
 
-            //update_native_pwm_channels(ctx.local.native_pwm_channels, &target_pwm_values.0[16..19]);
+            for channel in ctx.local.pac9685_channels.iter_mut() {
+                channel
+                    .configure(ctx.local.pac9685, target_pwm_values.values[channel.id()])
+                    .unwrap();
+            }
 
             //-----------------------------------------------------------------
 
@@ -359,4 +403,8 @@ mod app {
     }
 }
 
-pub fn update_pca9685_channels(_targets: &[u16]) {}
+fn pac9685_prescaler(freq: Hertz) -> u8 {
+    const PCA9685_INTERNAL_CLK_HZ: f32 = 25_000_000.0;
+
+    libm::roundf(PCA9685_INTERNAL_CLK_HZ / (4096 * freq.to_Hz()) as f32) as u8 - 1
+}
