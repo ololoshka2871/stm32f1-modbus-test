@@ -30,7 +30,14 @@ impl PCA9685Ch {
                 controller.set_channel_off(self.channel, target)?;
             }
             Position::RightAligend => {
-                controller.set_channel_on(self.channel, target)?;
+                controller.set_channel_on(
+                    self.channel,
+                    if target == 0 {
+                        0
+                    } else {
+                        crate::config::MAX_PWM_VAL - target
+                    },
+                )?;
                 controller.set_channel_off(self.channel, 0)?;
             }
         }
