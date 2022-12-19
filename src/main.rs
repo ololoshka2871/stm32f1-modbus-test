@@ -255,6 +255,9 @@ mod app {
         pac9685
             .set_prescale(pac9685_prescaler(config::MAX_PWM_FREQ.Hz()))
             .unwrap();
+        for ch in unsafe { PCA9685_PWM_CHANNELS.as_mut().unwrap_unchecked() }.iter_mut() {
+            ch.prepare(&mut pac9685).unwrap();
+        }
         pac9685.enable().unwrap();
 
         //---------------------------------------------------------------------
@@ -350,15 +353,20 @@ mod app {
 
         ctx.shared.rtu.lock(|rtu| rtu.pool());
 
-        if let Some((target_pwm_values, target_pwm_freq)) = ctx
+        if let (Some(target_pwm_values), target_pwm_freq) = ctx
             .local
             .data
             .process(unsafe { core::mem::transmute(ctx.local.pwm) })
         {
-            ctx.local
-                .pac9685
-                .set_prescale(pac9685_prescaler(target_pwm_freq))
-                .unwrap();
+            if let Some(target_pwm_freq) = target_pwm_freq {
+                ctx.local
+                    .pac9685
+                    .set_prescale(pac9685_prescaler(target_pwm_freq))
+                    .unwrap();
+                ctx.local.native_pwm.set_period(target_pwm_freq);
+            }
+
+            //-----------------------------------------------------------------
 
             for channel in ctx.local.pac9685_channels.iter_mut() {
                 channel
@@ -369,7 +377,6 @@ mod app {
             //-----------------------------------------------------------------
 
             let native_pwm = ctx.local.native_pwm;
-            native_pwm.set_period(target_pwm_freq);
             let mut set_native_channel_duty =
                 move |channel: Channel,
                       target_pwm_values: &PWMValues<20>,

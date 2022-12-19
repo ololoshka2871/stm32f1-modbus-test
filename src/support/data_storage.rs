@@ -15,7 +15,8 @@ pub struct DataStorage {
     pub total_load: f32,
     pub chank_load: [f32; 10],
 
-    pub modified: bool,
+    pub pwm_modified: bool,
+    pub freq_modified: bool,
 }
 
 impl DataStorage {
@@ -25,7 +26,8 @@ impl DataStorage {
             channels_target: Default::default(),
             total_load: 0.0,
             chank_load: Default::default(),
-            modified: false,
+            pwm_modified: false,
+            freq_modified: false,
         }
     }
 }
@@ -198,7 +200,7 @@ impl libremodbus_rs::DataInterface for DataStorage {
                                 return Err(MbError::MB_EINVAL);
                             }
                         }
-                        self.modified = true;
+                        self.pwm_modified = true;
                         return Ok(());
                     }
                     0x0200 => {
@@ -212,7 +214,7 @@ impl libremodbus_rs::DataInterface for DataStorage {
                             .into();
                         if f >= crate::config::MIN_PWM_FREQ && f <= crate::config::MAX_PWM_FREQ {
                             self.pwm_base_freq = Hertz::Hz(f);
-                            self.modified = true;
+                            self.freq_modified = true;
                             return Ok(());
                         } else {
                             return Err(MbError::MB_EINVAL);

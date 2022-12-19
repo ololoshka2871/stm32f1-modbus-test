@@ -6,6 +6,7 @@ use super::Position;
 pub struct PCA9685Ch {
     channel: Channel,
     position: Position,
+    current_target: u16,
 }
 
 impl PCA9685Ch {
@@ -13,7 +14,18 @@ impl PCA9685Ch {
         Self {
             channel: id,
             position,
+            current_target: 0,
         }
+    }
+
+    pub fn prepare<T, E>(&mut self, controller: &mut Pca9685<T>) -> Result<(), Error<E>>
+    where
+        T: Write<Error = E> + WriteRead<Error = E>,
+    {
+        controller.set_channel_on(self.channel, 0)?;
+        controller.set_channel_off(self.channel, 0)?;
+        self.current_target = 0;
+        Ok(())
     }
 
     pub fn configure<T, E>(
@@ -24,22 +36,23 @@ impl PCA9685Ch {
     where
         T: Write<Error = E> + WriteRead<Error = E>,
     {
-        match self.position {
-            Position::LeftAligned => {
-                controller.set_channel_on(self.channel, 0)?;
-                controller.set_channel_off(self.channel, target)?;
+        if self.current_target != target {
+            match self.position {
+                Position::LeftAligned => {
+                    controller.set_channel_off(self.channel, target)?;
+                }
+                Position::RightAligend => {
+                    controller.set_channel_on(
+                        self.channel,
+                        if target == 0 {
+                            0
+                        } else {
+                            crate::config::MAX_PWM_VAL - target
+                        },
+                    )?;
+                }
             }
-            Position::RightAligend => {
-                controller.set_channel_on(
-                    self.channel,
-                    if target == 0 {
-                        0
-                    } else {
-                        crate::config::MAX_PWM_VAL - target
-                    },
-                )?;
-                controller.set_channel_off(self.channel, 0)?;
-            }
+            self.current_target = target;
         }
 
         Ok(())
