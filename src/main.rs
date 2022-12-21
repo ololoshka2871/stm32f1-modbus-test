@@ -14,7 +14,7 @@ use stm32f1xx_hal::afio::AfioExt;
 use stm32f1xx_hal::flash::FlashExt;
 use stm32f1xx_hal::gpio::{
     Alternate, Floating, GpioExt, Input, OpenDrain, Output, PushPull, PA1, PA10, PA11, PA2, PA3,
-    PA5, PA8, PA9, PB6, PB7,
+    PA8, PA9, PB6, PB7,
 };
 use stm32f1xx_hal::i2c::BlockingI2c;
 use stm32f1xx_hal::pac::{I2C1, TIM1, TIM2, USART2};
@@ -44,7 +44,6 @@ mod app {
 
     #[local]
     struct Local {
-        led: PA5<Output<PushPull>>,
         data: &'static mut support::DataStorage,
         pwm: [&'static mut dyn PWMChannelId; 20],
         pac9685_channels: &'static mut [PCA9685Ch; 16],
@@ -94,13 +93,8 @@ mod app {
 
         let mut gpioa = ctx.device.GPIOA.split();
         let mut gpiob = ctx.device.GPIOB.split();
-        /*
-        let mut gpioc = ctx.device.GPIOC.split();
-        */
+
         let mut afio = ctx.device.AFIO.constrain();
-        /*
-        let (pa15, pb3, pb4) = afio.mapr.disable_jtag(gpioa.pa15, gpiob.pb3, gpiob.pb4);
-        */
 
         let rcc = ctx.device.RCC.constrain();
         let clocks = rcc.cfgr.sysclk(32u32.MHz()).freeze(&mut flash.acr);
@@ -262,14 +256,9 @@ mod app {
 
         //---------------------------------------------------------------------
 
-        let led = gpioa
-            .pa5
-            .into_push_pull_output_with_state(&mut gpioa.crl, stm32f1xx_hal::gpio::PinState::Low);
-
         (
             Shared { rtu },
             Local {
-                led,
                 data: unsafe { DATA_STORAGE.as_mut().unwrap_unchecked() },
                 pwm,
                 pac9685_channels: unsafe { PCA9685_PWM_CHANNELS.as_mut().unwrap_unchecked() },
@@ -292,13 +281,12 @@ mod app {
 
     //-------------------------------------------------------------------------
 
-    #[task(binds = USART2, shared = [rtu], local = [led], priority = 3)]
+    #[task(binds = USART2, shared = [rtu], priority = 3)]
     fn usart2_tx(mut ctx: usart2_tx::Context) {
         use libremodbus_rs::REDEControl;
         use libremodbus_rs::SerialEvent;
         use systick_monotonic::*;
 
-        //let _ = ctx.local.led.set_high();
         let do_poll = ctx.shared.rtu.lock(|rtu| {
             let sr = unsafe { (*USART2::ptr()).sr.read() };
             let cr = unsafe { (*USART2::ptr()).cr1.read() };
@@ -323,24 +311,21 @@ mod app {
             }
             false
         });
-        //let _ = ctx.local.led.set_low();
 
         if do_poll {
             modbus_pooler::spawn().unwrap();
         }
     }
 
-    #[task(binds = TIM2, shared = [rtu], local = [/*led*/], priority = 3)]
+    #[task(binds = TIM2, shared = [rtu], priority = 3)]
     fn tim2(mut ctx: tim2::Context) {
         use libremodbus_rs::MBTimerEvent;
 
-        //let _ = ctx.local.led.set_high();
         let do_poll = ctx.shared.rtu.lock(|rtu| {
             let res = rtu.on_timer();
             unsafe { (*TIM2::ptr()).sr.modify(|_, w| w.uif().clear_bit()) };
             res
         });
-        //let _ = ctx.local.led.set_low();
 
         if do_poll {
             modbus_pooler::spawn().unwrap();
