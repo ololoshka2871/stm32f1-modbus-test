@@ -11,7 +11,7 @@ pub trait PWMCtrlExt<const N: usize> {
     fn process(
         &mut self,
         channels: &[&dyn PWMChannelId; N],
-    ) -> (Option<PWMValues<N>>, Option<HertzU32>);
+    ) -> (Option<PWMValues<N>>, Option<HertzU32>, bool);
 }
 
 impl<const N: usize> PWMValues<N> {

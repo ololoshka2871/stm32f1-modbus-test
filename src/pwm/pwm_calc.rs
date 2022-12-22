@@ -7,7 +7,7 @@ impl PWMCtrlExt<20> for support::DataStorage {
     fn process(
         &mut self,
         channels: &[&dyn PWMChannelId; 20],
-    ) -> (Option<PWMValues<20>>, Option<HertzU32>) {
+    ) -> (Option<PWMValues<20>>, Option<HertzU32>, bool) {
         fn f((i, chank): (usize, &mut f32), ch_target: u32, chank_len: u32) {
             let chank_start = i as u32 * chank_len;
             let chank_end = chank_start + chank_len;
@@ -22,7 +22,14 @@ impl PWMCtrlExt<20> for support::DataStorage {
             *chank += support::map(load as f32, 0.0, chank_len as f32, 0.0, 100.0);
         }
 
-        if self.pwm_modified {
+        let freq = if self.freq_modified {
+            self.freq_modified = false;
+            Some(self.pwm_base_freq)
+        } else {
+            None
+        };
+
+        let res = if self.pwm_modified || freq.is_some() {
             self.pwm_modified = false;
             let mut res = PWMValues::default();
             res.values.copy_from_slice(&self.channels_target);
@@ -63,16 +70,11 @@ impl PWMCtrlExt<20> for support::DataStorage {
                 (100 * self.chank_load.len()) as f32,
             );
 
-            let f = if self.freq_modified {
-                self.freq_modified = false;
-                Some(self.pwm_base_freq)
-            } else {
-                None
-            };
-
-            (Some(res), f)
+            Some(res)
         } else {
-            (None, None)
-        }
+            None
+        };
+
+        (res, freq, freq.is_some())
     }
 }

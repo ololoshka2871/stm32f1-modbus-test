@@ -338,24 +338,31 @@ mod app {
 
         ctx.shared.rtu.lock(|rtu| rtu.pool());
 
-        if let (Some(target_pwm_values), target_pwm_freq) = ctx
+        let (target_pwm_values, target_pwm_freq, force_update_channels) = ctx
             .local
             .data
-            .process(unsafe { core::mem::transmute(ctx.local.pwm) })
-        {
-            if let Some(target_pwm_freq) = target_pwm_freq {
-                ctx.local
-                    .pac9685
-                    .set_prescale(pac9685_prescaler(target_pwm_freq))
-                    .unwrap();
-                ctx.local.native_pwm.set_period(target_pwm_freq);
-            }
+            .process(unsafe { core::mem::transmute(ctx.local.pwm) });
 
-            //-----------------------------------------------------------------
+        //-----------------------------------------------------------------
 
+        if let Some(target_pwm_freq) = target_pwm_freq {
+            ctx.local
+                .pac9685
+                .set_prescale(pac9685_prescaler(target_pwm_freq))
+                .unwrap();
+            ctx.local.native_pwm.set_period(target_pwm_freq);
+        }
+
+        //-----------------------------------------------------------------
+
+        if let Some(target_pwm_values) = target_pwm_values {
             for channel in ctx.local.pac9685_channels.iter_mut() {
                 channel
-                    .configure(ctx.local.pac9685, target_pwm_values.values[channel.id()])
+                    .configure(
+                        ctx.local.pac9685,
+                        target_pwm_values.values[channel.id()],
+                        force_update_channels,
+                    )
                     .unwrap();
             }
 

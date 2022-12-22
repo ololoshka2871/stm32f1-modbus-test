@@ -32,11 +32,12 @@ impl PCA9685Ch {
         &mut self,
         controller: &mut Pca9685<T>,
         target: u16,
+        force: bool,
     ) -> Result<(), Error<E>>
     where
         T: Write<Error = E> + WriteRead<Error = E>,
     {
-        if self.current_target != target {
+        if self.current_target != target || force {
             match self.position {
                 Position::LeftAligned => {
                     controller.set_channel_off(self.channel, target)?;
