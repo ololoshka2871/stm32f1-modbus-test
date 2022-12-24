@@ -4,17 +4,17 @@
 
 ## Tools
 * Rust nightly
-* Rtic
-* free-modbus
-* pwm-pca9685
+* [Rtic](https://rtic.rs/1/book/en/)
+* [libremodbus](https://github.com/nucleron/libremodbus)
+* [pwm-pca9685](https://github.com/eldruin/pwm-pca9685-rs)
 
 ## Build
 ```
 $ rustup toolchain install nightly
-$ rustup target add thumbv7em-none-eabi
 $ git clone --recurcive https://github.com/ololoshka2871/pwm-20ch
 $ cd pwm-20ch
 $ rustup override set nightly
+$ rustup target add thumbv7em-none-eabi
 $ cargo build
 ```
 

@@ -13,11 +13,11 @@ use rtic::app;
 use stm32f1xx_hal::afio::AfioExt;
 use stm32f1xx_hal::flash::FlashExt;
 use stm32f1xx_hal::gpio::{
-    Alternate, Floating, GpioExt, Input, OpenDrain, Output, PushPull, PA1, PA10, PA11, PA2, PA3,
-    PA8, PA9, PB6, PB7,
+    Alternate, Floating, GpioExt, Input, OpenDrain, Output, PushPull, PA10, PA11, PA8, PA9, PB10,
+    PB11, PB5, PB6, PB7,
 };
 use stm32f1xx_hal::i2c::BlockingI2c;
-use stm32f1xx_hal::pac::{I2C1, TIM1, TIM2, USART2};
+use stm32f1xx_hal::pac::{I2C2, TIM1, TIM2, USART1};
 use stm32f1xx_hal::serial::{Config, Serial};
 use stm32f1xx_hal::time::Hertz;
 use stm32f1xx_hal::timer::{Ch, Channel, CounterUs, PwmHz, Tim1NoRemap};
@@ -59,7 +59,8 @@ mod app {
                 PA11<Alternate<PushPull>>,
             ),
         >,
-        pac9685: Pca9685<BlockingI2c<I2C1, (PB6<Alternate<OpenDrain>>, PB7<Alternate<OpenDrain>>)>>,
+        pac9685:
+            Pca9685<BlockingI2c<I2C2, (PB10<Alternate<OpenDrain>>, PB11<Alternate<OpenDrain>>)>>,
     }
 
     #[monotonic(binds = SysTick, default = true)]
@@ -74,10 +75,10 @@ mod app {
         use stm32f1xx_hal::prelude::_stm32f4xx_hal_timer_TimerExt;
         use stm32f1xx_hal::timer::Tim1NoRemap;
 
-        static mut UART2: Option<
+        static mut UART1: Option<
             support::Serial<
-                Serial<USART2, (PA2<Alternate<PushPull>>, PA3<Input<Floating>>)>,
-                PA1<Output<PushPull>>,
+                Serial<USART1, (PB6<Alternate<PushPull>>, PB7<Input<Floating>>)>,
+                PB5<Output<PushPull>>,
             >,
         > = None;
 
@@ -103,11 +104,11 @@ mod app {
 
         //---------------------------------------------------------------------
 
-        let tx = gpioa.pa2.into_alternate_push_pull(&mut gpioa.crl);
-        let rx = gpioa.pa3;
-        let re_de = gpioa
-            .pa1
-            .into_push_pull_output_with_state(&mut gpioa.crl, stm32f1xx_hal::gpio::PinState::Low);
+        let tx = gpiob.pb6.into_alternate_push_pull(&mut gpiob.crl);
+        let rx = gpiob.pb7;
+        let re_de = gpiob
+            .pb5
+            .into_push_pull_output_with_state(&mut gpiob.crl, stm32f1xx_hal::gpio::PinState::Low);
 
         let mut timer = ctx.device.TIM2.counter_us(&clocks);
         timer.listen(stm32f1xx_hal::timer::Event::Update);
@@ -118,9 +119,9 @@ mod app {
             .modify(|_, w| w.dbg_tim2_stop().set_bit());
 
         unsafe {
-            UART2.replace(support::Serial::new(
-                Serial::usart2(
-                    ctx.device.USART2,
+            UART1.replace(support::Serial::new(
+                Serial::usart1(
+                    ctx.device.USART1,
                     (tx, rx),
                     &mut afio.mapr,
                     Config::default().baudrate(9600.bps()),
@@ -137,7 +138,7 @@ mod app {
         let rtu = unsafe {
             libremodbus_rs::Rtu::init(
                 config::MODBUS_ADDR,
-                UART2.as_mut().unwrap_unchecked(),
+                UART1.as_mut().unwrap_unchecked(),
                 config::RS485_BOUD_RATE,
                 MODBUS_TIMER.as_mut().unwrap_unchecked(),
                 DATA_STORAGE.as_mut().unwrap_unchecked(),
@@ -226,13 +227,12 @@ mod app {
             ]
         };
 
-        let scl = gpiob.pb6.into_alternate_open_drain(&mut gpiob.crl);
-        let sda = gpiob.pb7.into_alternate_open_drain(&mut gpiob.crl);
+        let scl = gpiob.pb10.into_alternate_open_drain(&mut gpiob.crh);
+        let sda = gpiob.pb11.into_alternate_open_drain(&mut gpiob.crh);
 
-        let i2c = BlockingI2c::i2c1(
-            ctx.device.I2C1,
+        let i2c = BlockingI2c::i2c2(
+            ctx.device.I2C2,
             (scl, sda),
-            &mut afio.mapr,
             stm32f1xx_hal::i2c::Mode::Fast {
                 frequency: 400.kHz(),
                 duty_cycle: stm32f1xx_hal::i2c::DutyCycle::Ratio16to9,
@@ -288,8 +288,8 @@ mod app {
         use systick_monotonic::*;
 
         let do_poll = ctx.shared.rtu.lock(|rtu| {
-            let sr = unsafe { (*USART2::ptr()).sr.read() };
-            let cr = unsafe { (*USART2::ptr()).cr1.read() };
+            let sr = unsafe { (*USART1::ptr()).sr.read() };
+            let cr = unsafe { (*USART1::ptr()).cr1.read() };
 
             if sr.txe().bit_is_set() && cr.txeie().bit_is_set() {
                 let res = rtu.on_tx();
