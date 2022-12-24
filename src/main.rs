@@ -98,7 +98,11 @@ mod app {
         let mut afio = ctx.device.AFIO.constrain();
 
         let rcc = ctx.device.RCC.constrain();
-        let clocks = rcc.cfgr.sysclk(32u32.MHz()).freeze(&mut flash.acr);
+        let clocks = rcc
+            .cfgr
+            .use_hse(config::MCU_XTAL_HZ.Hz())
+            .sysclk(32u32.MHz())
+            .freeze(&mut flash.acr);
 
         let mono = Systick::new(ctx.core.SYST, clocks.sysclk().to_Hz());
 
