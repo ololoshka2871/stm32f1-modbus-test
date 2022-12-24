@@ -6,6 +6,8 @@ pub const MB_DEV_ID: u16 = 0xDBFB;
 pub const RS485_BOUD_RATE: u32 = 57_600;
 pub const MODBUS_ADDR: u8 = 1;
 
+pub const ADDR_BITS: [u8; 4] = [1, 2, 3, 7];
+
 //-----------------------------------------------------------------------------
 
 pub const SYSTICK_RATE_HZ: u32 = 1_000;

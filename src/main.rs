@@ -108,6 +108,21 @@ mod app {
 
         //---------------------------------------------------------------------
 
+        let addr_pins = (
+            gpioa.pa4.into_pull_up_input(&mut gpioa.crl),
+            gpioa.pa5.into_pull_up_input(&mut gpioa.crl),
+            gpioa.pa6.into_pull_up_input(&mut gpioa.crl),
+            gpioa.pa7.into_pull_up_input(&mut gpioa.crl),
+        );
+
+        let modbus_addr = config::MODBUS_ADDR
+            + (((addr_pins.0.is_low() as u8) << config::ADDR_BITS[0])
+                | ((addr_pins.1.is_low() as u8) << config::ADDR_BITS[1])
+                | ((addr_pins.2.is_low() as u8) << config::ADDR_BITS[2])
+                | ((addr_pins.3.is_low() as u8) << config::ADDR_BITS[3]));
+
+        //---------------------------------------------------------------------
+
         let tx = gpiob.pb6.into_alternate_push_pull(&mut gpiob.crl);
         let rx = gpiob.pb7;
         let re_de = gpiob
@@ -141,7 +156,7 @@ mod app {
 
         let rtu = unsafe {
             libremodbus_rs::Rtu::init(
-                config::MODBUS_ADDR,
+                modbus_addr,
                 UART1.as_mut().unwrap_unchecked(),
                 config::RS485_BOUD_RATE,
                 MODBUS_TIMER.as_mut().unwrap_unchecked(),
