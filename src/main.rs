@@ -300,8 +300,8 @@ mod app {
 
     //-------------------------------------------------------------------------
 
-    #[task(binds = USART2, shared = [rtu], priority = 3)]
-    fn usart2_tx(mut ctx: usart2_tx::Context) {
+    #[task(binds = USART1, shared = [rtu], priority = 3)]
+    fn usart1_isr(mut ctx: usart1_isr::Context) {
         use libremodbus_rs::REDEControl;
         use libremodbus_rs::SerialEvent;
         use systick_monotonic::*;
