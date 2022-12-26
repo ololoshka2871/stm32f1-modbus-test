@@ -109,10 +109,10 @@ mod app {
         //---------------------------------------------------------------------
 
         let addr_pins = (
-            gpioa.pa4.into_pull_up_input(&mut gpioa.crl),
-            gpioa.pa5.into_pull_up_input(&mut gpioa.crl),
-            gpioa.pa6.into_pull_up_input(&mut gpioa.crl),
             gpioa.pa7.into_pull_up_input(&mut gpioa.crl),
+            gpioa.pa6.into_pull_up_input(&mut gpioa.crl),
+            gpioa.pa5.into_pull_up_input(&mut gpioa.crl),
+            gpioa.pa4.into_pull_up_input(&mut gpioa.crl),
         );
 
         let modbus_addr = config::MODBUS_ADDR
