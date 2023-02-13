@@ -25,6 +25,12 @@ $ cargo build
 # Connection
 ![](img/mcu_conn.png)
 
+### Modbus address pins
+* PA3 - ADDR0
+* PA4 - ADDR1
+* PA5 - ADDR2
+* PA6 - ADDR3
+
 ### pca9685's 16 channels 
 * CH 0-3, 8-11 - "прямые"
 * CH 4-7, 12-15 - "инверсные"
