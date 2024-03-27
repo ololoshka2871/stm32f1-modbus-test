@@ -28,7 +28,7 @@ jobs:
           cargo build --release
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v3
         with:
           name: pwm-20ch.elf
           path: target/thumbv7m-none-eabi/release/pwm-20ch
