@@ -1,0 +1,35 @@
+name: Build firmware
+on: push
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Install gcc-arm-none-eabi 
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-arm-none-eabi
+
+      - name: Install rust
+        uses: actions-rs/toolchain@v1
+        with:
+            toolchain: nightly
+            override: true
+            target: thumbv7m-none-eabi
+            profile: minimal
+
+      - name: Clone repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Build
+        run: |
+          cargo build --release
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: pwm-20ch.elf
+          path: target/thumbv7m-none-eabi/release/pwm-20ch
+          if-no-files-found: error
