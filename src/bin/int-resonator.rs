@@ -201,6 +201,9 @@ mod app {
 
     #[task(shared = [rtu], local = [data])]
     fn modbus_pooler(mut ctx: modbus_pooler::Context) {
+        let now = monotonics::now();
+        ctx.local.data.seconds_counter = (now.duration_since_epoch().to_secs() & 0xFFFF) as u16; // update seconds counter
+
         ctx.shared.rtu.lock(|rtu| {
             rtu.pool();
             rtu.pool();
