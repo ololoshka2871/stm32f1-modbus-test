@@ -65,9 +65,9 @@ impl libremodbus_rs::DataInterface for DataStorage {
                         if reg_num > 1 {
                             Err(MbError::MB_ENOREG)?;
                         }
-                        reg_buff
+                        return reg_buff
                             .write_with::<u16>(&mut 0, crate::config::MB_DEV_ID, BE)
-                            .map_err(|_| MbError::MB_EIO)?;
+                            .map_err(|_| MbError::MB_EIO);
                     }
                     0x0010..=0x0013 => {
                         // Device HW version

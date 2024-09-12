@@ -6,7 +6,7 @@ use rtic::app;
 
 use stm32f1xx_hal::afio::AfioExt;
 use stm32f1xx_hal::flash::FlashExt;
-use stm32f1xx_hal::gpio::{Alternate, Floating, GpioExt, Input, Output, PushPull, PA15, PB6, PB7};
+use stm32f1xx_hal::gpio::{Alternate, Floating, GpioExt, Input, Output, PushPull, PA10, PA15, PA9};
 
 use stm32f1xx_hal::pac::{TIM2, USART1};
 use stm32f1xx_hal::timer::CounterUs;
@@ -50,8 +50,10 @@ mod app {
 
         static mut UART1: Option<
             Serial<
-                stm32f1xx_hal::serial::Serial<USART1, 
-                    (PB6<Alternate<PushPull>>, PB7<Input<Floating>>)>,
+                stm32f1xx_hal::serial::Serial<
+                    USART1,
+                    (PA9<Alternate<PushPull>>, PA10<Input<Floating>>),
+                >,
                 PA15<Output<PushPull>>,
             >,
         > = None;
@@ -64,7 +66,7 @@ mod app {
         let mut flash = ctx.device.FLASH.constrain();
 
         let mut gpioa = ctx.device.GPIOA.split();
-        let mut gpiob = ctx.device.GPIOB.split();
+        let gpiob = ctx.device.GPIOB.split();
 
         let mut afio = ctx.device.AFIO.constrain();
 
@@ -80,8 +82,8 @@ mod app {
         //---------------------------------------------------------------------
 
         // fixme
-        let tx = gpiob.pb6.into_alternate_push_pull(&mut gpiob.crl);
-        let rx = gpiob.pb7;
+        let tx = gpioa.pa9.into_alternate_push_pull(&mut gpioa.crh);
+        let rx = gpioa.pa10;
 
         // disable jtag
         let (pa15, _pb3, _pb4) = afio.mapr.disable_jtag(gpioa.pa15, gpiob.pb3, gpiob.pb4);
@@ -124,7 +126,9 @@ mod app {
             )
         };
 
-        let _led = gpioa.pa5.into_push_pull_output_with_state(&mut gpioa.crl, stm32f1xx_hal::gpio::PinState::Low);
+        let _led = gpioa
+            .pa5
+            .into_push_pull_output_with_state(&mut gpioa.crl, stm32f1xx_hal::gpio::PinState::Low);
 
         //---------------------------------------------------------------------
 
@@ -202,7 +206,10 @@ mod app {
 
     #[task(shared = [rtu], local = [data])]
     fn modbus_pooler(mut ctx: modbus_pooler::Context) {
-        ctx.shared.rtu.lock(|rtu| rtu.pool());
+        ctx.shared.rtu.lock(|rtu| {
+            rtu.pool();
+            rtu.pool();
+        });
     }
 
     #[task(shared = [rtu])]
