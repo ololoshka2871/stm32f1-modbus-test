@@ -26,8 +26,8 @@ jobs:
       - name: Build
         run: |
           cargo build --release
-          arm-none-eabi-objcopy -O ihex target/thumbv7m-none-eabi/debug/ext-quartz-8mhz ext-quartz-8mhz.hex
-          arm-none-eabi-objcopy -O ihex target/thumbv7m-none-eabi/debug/int-resonator int-resonator.hex
+          arm-none-eabi-objcopy -O ihex target/thumbv7m-none-eabi/release/ext-quartz-8mhz ext-quartz-8mhz.hex
+          arm-none-eabi-objcopy -O ihex target/thumbv7m-none-eabi/release/int-resonator int-resonator.hex
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v3
