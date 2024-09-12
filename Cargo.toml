@@ -1,12 +1,11 @@
 [package]
 authors = ["ololoshka2871"]
-edition = "2018"
+edition = "2021"
 readme = "README.md"
-name = "pwm-20ch"
-version = "0.2.3"
+name = "stm32f1-modbus-test"
+version = "0.0.1"
 resolver = "2"
-keywords = ["stm32", "pwm", "pca9685", "modbus"]
-repository = "https://github.com/ololoshka2871/pwm-20ch"
+keywords = ["stm32", "modbus"]
 
 [dependencies]
 num = { version = "0.4", default-features = false }
@@ -25,16 +24,10 @@ panic-abort = "0.3"
 stm32f1xx-hal = { version = "0.9.0", features =["rt"], optional = true }
 stm32-device-signature = "0.3.3"
 
-pwm-pca9685 = "0.3"
 libremodbus-rs = { path = "libs/libremodbus-rs", default-features = false, features = ["rtu", "ascii", "holdings", "inputs"] }
 
 cortex-m-rtic = { version = "1.1" }
 systick-monotonic = "1.0.1"
-
-# defmt
-#defmt = "0.2"
-#defmt-macros = "0.2"
-#defmt-rtt = "0.2"
 
 [profile.dev.package."*"]
 opt-level = "z"
@@ -48,23 +41,14 @@ panic = "abort"
 [profile.release]
 opt-level = "s"
 codegen-units = 1 # better optimizations
-debug = true # добавлять отладочные символы. Не влияет на размер исполняемого кода, зато работает дебаг
+debug = true      # добавлять отладочные символы. Не влияет на размер исполняемого кода, зато работает дебаг
 panic = 'abort'
 lto = true
 
 [features]
 default = [
   "stm32f103b",
-  #"defmt-debug",
 ]
 
 stm32f103b = ["stm32f103"]
 stm32f103 = ["stm32f1xx-hal/stm32f103", "stm32f1xx-hal/medium", "stm32-device-signature/stm32f1"]
-
-# defmt: do NOT modify these features
-#defmt-default = []
-#defmt-trace = []
-#defmt-debug = []
-#defmt-info = []
-#defmt-warn = []
-#defmt-error = []

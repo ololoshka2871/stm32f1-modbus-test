@@ -8,9 +8,13 @@
 # runner = "arm-none-eabi-gdb -q -x openocd.gdb"
 # runner = "gdb-multiarch -q -x openocd.gdb"
 # runner = "gdb -q -x openocd.gdb"
-# runner = "probe-run --chip STM32L442KCTx"
+runner = "probe-run --chip STM32F103C8 --no-location"
+linker = "flip-link"
 
 rustflags = [
+  # Flip linker
+  "-C", "linker=flip-link",
+
   # This is needed if your flash or ram addresses are not aligned to 0x10000 in memory.x
   # See https://github.com/rust-embedded/cortex-m-quickstart/pull/95
   #"-C", "link-arg=--nmagic",

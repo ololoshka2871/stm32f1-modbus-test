@@ -30,6 +30,6 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v3
         with:
-          name: pwm-20ch.elf
-          path: target/thumbv7m-none-eabi/release/pwm-20ch
+          name: stm32f1-modbus-test.elf
+          path: target/thumbv7m-none-eabi/release/stm32f1-modbus-test
           if-no-files-found: error
