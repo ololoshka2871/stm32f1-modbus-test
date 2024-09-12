@@ -26,10 +26,14 @@ jobs:
       - name: Build
         run: |
           cargo build --release
+          arm-none-eabi-objcopy.exe -O ihex target/thumbv7m-none-eabi/debug/ext-quartz-8mhz ext-quartz-8mhz.hex
+          arm-none-eabi-objcopy.exe -O ihex target/thumbv7m-none-eabi/debug/int-resonator int-resonator.hex
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v3
         with:
-          name: stm32f1-modbus-test.elf
-          path: target/thumbv7m-none-eabi/release/stm32f1-modbus-test
+          name: Executables (iHex)
+          path: |
+            ext-quartz-8mhz.hex
+            int-resonator.hex
           if-no-files-found: error

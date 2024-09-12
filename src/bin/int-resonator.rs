@@ -1,9 +1,6 @@
 #![no_main]
 #![no_std]
 
-mod config;
-mod support;
-
 use panic_abort as _;
 use rtic::app;
 
@@ -12,12 +9,17 @@ use stm32f1xx_hal::flash::FlashExt;
 use stm32f1xx_hal::gpio::{Alternate, Floating, GpioExt, Input, Output, PushPull, PA15, PB6, PB7};
 
 use stm32f1xx_hal::pac::{TIM2, USART1};
-use stm32f1xx_hal::serial::{Config, Serial};
 use stm32f1xx_hal::timer::CounterUs;
 
 use libremodbus_rs::MBInterface;
 
 use systick_monotonic::Systick;
+
+use stm32f1_modbus_test::*;
+
+//-----------------------------------------------------------------------------
+
+pub const MODBUS_ADDR: u8 = 2;
 
 //-----------------------------------------------------------------------------
 
@@ -32,7 +34,7 @@ mod app {
 
     #[local]
     struct Local {
-        data: &'static mut support::DataStorage,
+        data: &'static mut DataStorage,
     }
 
     #[monotonic(binds = SysTick, default = true)]
@@ -46,14 +48,15 @@ mod app {
         use stm32f1xx_hal::prelude::_stm32f4xx_hal_timer_TimerExt;
 
         static mut UART1: Option<
-            support::Serial<
-                Serial<USART1, (PB6<Alternate<PushPull>>, PB7<Input<Floating>>)>,
+            Serial<
+                stm32f1xx_hal::serial::Serial<USART1, 
+                    (PB6<Alternate<PushPull>>, PB7<Input<Floating>>)>,
                 PA15<Output<PushPull>>,
             >,
         > = None;
 
-        static mut MODBUS_TIMER: Option<support::Timer<CounterUs<TIM2>>> = None;
-        static mut DATA_STORAGE: Option<support::DataStorage> = None;
+        static mut MODBUS_TIMER: Option<Timer<CounterUs<TIM2>>> = None;
+        static mut DATA_STORAGE: Option<DataStorage> = None;
 
         //---------------------------------------------------------------------
 
@@ -67,15 +70,10 @@ mod app {
         let rcc = ctx.device.RCC.constrain();
         let clocks = rcc
             .cfgr
-            .use_hse(config::MCU_XTAL_HZ.Hz())
             .sysclk(32u32.MHz())
             .freeze(&mut flash.acr);
 
         let mono = Systick::new(ctx.core.SYST, clocks.sysclk().to_Hz());
-
-        //---------------------------------------------------------------------
-
-        let modbus_addr = config::MODBUS_ADDR;
 
         //---------------------------------------------------------------------
 
@@ -98,31 +96,33 @@ mod app {
             .modify(|_, w| w.dbg_tim2_stop().set_bit());
 
         unsafe {
-            UART1.replace(support::Serial::new(
-                Serial::usart1(
+            UART1.replace(Serial::new(
+                stm32f1xx_hal::serial::Serial::usart1(
                     ctx.device.USART1,
                     (tx, rx),
                     &mut afio.mapr,
-                    Config::default().baudrate(9600.bps()),
+                    stm32f1xx_hal::serial::Config::default().baudrate(9600.bps()),
                     clocks,
                 ),
                 re_de,
                 clocks,
             ));
 
-            MODBUS_TIMER.replace(support::Timer::new(timer));
-            DATA_STORAGE.replace(support::DataStorage::new());
+            MODBUS_TIMER.replace(Timer::new(timer));
+            DATA_STORAGE.replace(DataStorage::new());
         }
 
         let rtu = unsafe {
             libremodbus_rs::Rtu::init(
-                modbus_addr,
+                MODBUS_ADDR,
                 UART1.as_mut().unwrap_unchecked(),
                 config::RS485_BOUD_RATE,
                 MODBUS_TIMER.as_mut().unwrap_unchecked(),
                 DATA_STORAGE.as_mut().unwrap_unchecked(),
             )
         };
+
+        let _led = gpioa.pa6.into_push_pull_output_with_state(&mut gpioa.crl, stm32f1xx_hal::gpio::PinState::Low);
 
         //---------------------------------------------------------------------
 
@@ -162,7 +162,7 @@ mod app {
                 if rtu.is_tx_finished() {
                     re_de_finaliser::spawn_after(
                         (libm::ceilf(
-                            support::WAIT_BITS_AFTER_TX_DONE as f32 * 1_000.0
+                            WAIT_BITS_AFTER_TX_DONE as f32 * 1_000.0
                                 / config::RS485_BOUD_RATE as f32,
                         ) as u64)
                             .millis(),

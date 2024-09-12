@@ -11,9 +11,8 @@
             "name": "cortex-debug (Debug)",
             "type": "cortex-debug",
             "cwd": "${workspaceRoot}",
-            "executable": "target/thumbv7m-none-eabi/debug/pwm-20ch", // бинарь
+            "executable": "target/thumbv7m-none-eabi/debug/int-resonator", // бинарь
             "request": "attach", // позволяет не прошивать таргет при запуске
-            "loadFiles": false, 
             "svdFile": "STM32F103.svd",
             "servertype": "external", // Подключиться к внешнему отладочному интерфейсу
             "gdbTarget": "localhost:2331", // адрес куда подключаться
@@ -29,9 +28,8 @@
             "name": "cortex-debug (Release)",
             "type": "cortex-debug",
             "cwd": "${workspaceRoot}",
-            "executable": "target/thumbv7m-none-eabi/release/pwm-20ch", // бинарь
+            "executable": "target/thumbv7m-none-eabi/release/int-resonator", // бинарь
             "request": "attach", // позволяет не прошивать таргет при запуске
-            "loadFiles": false, 
             "svdFile": "STM32F103.svd",
             "servertype": "external", // Подключиться к внешнему отладочному интерфейсу
             "gdbTarget": "localhost:2331", // адрес куда подключаться
