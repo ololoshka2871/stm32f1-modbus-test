@@ -1,5 +1,8 @@
 name: Build firmware
-on: push
+on: 
+  push:
+    tags:
+      - v*
 
 jobs:
   build:
@@ -29,11 +32,17 @@ jobs:
           arm-none-eabi-objcopy -O ihex target/thumbv7m-none-eabi/release/ext-quartz-8mhz ext-quartz-8mhz.hex
           arm-none-eabi-objcopy -O ihex target/thumbv7m-none-eabi/release/int-resonator int-resonator.hex
 
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v3
+      - uses: SebRollen/toml-action@v1.2.0
+        id: read_version
         with:
-          name: Executables (iHex)
-          path: |
+          file: 'Cargo.toml'
+          field: 'package.version'
+
+      - uses: akkuman/gitea-release-action@v1
+        with:
+          name: v${{ steps.read_version.outputs.value }}
+          body: This is an automatic ${{ steps.read_version.outputs.value }} release!
+          prerelease: true
+          files: |
             ext-quartz-8mhz.hex
             int-resonator.hex
-          if-no-files-found: error
